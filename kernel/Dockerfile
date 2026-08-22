@@ -18,7 +18,7 @@ RUN npm run build
 # image and their cloud layers (AI Defense, VirusTotal) stay OFF. Versions
 # are the build-time pins (verified 2026-07-19: cisco 2.0.12 on PyPI,
 # SkillSpector commit-resolved v2.3.1, both Python 3.12).
-FROM python:3.12-slim-bookworm AS scanners
+FROM python:3.14-slim-bookworm AS scanners
 
 ARG CISCO_SKILL_SCANNER_VERSION=2.0.12
 # SkillSpector publishes no tags — pin the commit (resolves to v2.3.1).
