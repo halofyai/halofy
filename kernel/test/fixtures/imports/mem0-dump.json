@@ -1,0 +1,51 @@
+{
+  "results": [
+    {
+      "id": "mem0-a1f3",
+      "memory": "The standard refund policy allows returns within 30 days of purchase for a full refund, provided the item is unused and in its original packaging.",
+      "metadata": {
+        "category": "policy",
+        "user_id": "support-bot",
+        "created_at": "2024-11-02T14:21:00Z"
+      }
+    },
+    {
+      "id": "mem0-b2c8",
+      "memory": "Customer Dana Whitfield's shipping address is 12 Oak Street, Portland, OR 97205.",
+      "metadata": {
+        "category": "customer",
+        "customer_id": "cust-4127"
+      }
+    },
+    {
+      "id": "mem0-c9d1",
+      "text": "Dana Whitfield is enrolled in the Gold loyalty tier, which grants free two-day shipping and early access to seasonal sales.",
+      "metadata": {
+        "category": "loyalty",
+        "customer_id": "cust-4127"
+      }
+    },
+    {
+      "id": "mem0-d4e7",
+      "data": "The support team escalates any ticket that mentions a chargeback to the finance team within one business hour.",
+      "metadata": {
+        "category": "process"
+      }
+    },
+    {
+      "memory": "Warranty claims for the Anvil Pro line require the original order number and a photo of the defect.",
+      "metadata": {
+        "category": "policy",
+        "note": "no id field on this item - importer must hash the content"
+      }
+    },
+    {
+      "id": "mem0-empty",
+      "memory": "   ",
+      "metadata": {
+        "category": "noise",
+        "note": "blank memory - importer must skip this row"
+      }
+    }
+  ]
+}

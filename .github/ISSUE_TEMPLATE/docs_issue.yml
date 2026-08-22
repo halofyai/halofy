@@ -1,0 +1,60 @@
+name: Documentation issue
+description: Something in the docs is wrong, missing, out of date, or contradicts the source.
+title: "docs: "
+labels: ["documentation", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Documentation that contradicts the source is a real defect — the source,
+        migrations, tests and contracts win, and the prose has to be corrected to
+        match. Please say which one you believe is right.
+
+  - type: input
+    id: location
+    attributes:
+      label: Where
+      description: >-
+        Repo-relative path and, if you can, a line or heading. For example
+        `docs/self-hosting.md` or `kernel/README.md#quickstart`. If it is a
+        published page, paste the URL as well.
+      placeholder: "docs/architecture.md — 'Storage tiers and the read path'"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of problem
+      options:
+        - Factually wrong — contradicts the code
+        - Out of date — the code moved and the docs did not
+        - Missing — something undocumented that needs documenting
+        - Unclear or ambiguous
+        - Broken link, bad path, or a command that does not run
+        - Typo or formatting
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What the docs say, and what is actually true
+      description: >-
+        Quote the passage, then state the correct behaviour and how you know —
+        a file and line, a test, a migration, a command with its real output.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested wording
+      description: Optional. A concrete replacement is faster to merge than a report.
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I am willing to open a pull request with the fix.

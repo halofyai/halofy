@@ -1,0 +1,92 @@
+# HaloMem self-host stack (M4, Module C).
+#
+#   npm run env:init
+#   docker compose up --build
+#
+# brings up Postgres (pgvector) and the kernel. The kernel waits for the DB to
+# pass its healthcheck, then boots — running the numbered migrations on the
+# fresh volume before serving on :8787.
+#
+# The password below is a local-dev default. Override it (and it flows into
+# both the DB and the kernel's DATABASE_URL) with:
+#   POSTGRES_PASSWORD=... docker compose up
+#
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: halomem
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run npm run env:init first}
+    volumes:
+      - halomem-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # pg_isready returns 0 only once the server accepts connections. The
+      # kernel's depends_on gate waits for this to pass.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d halomem"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  kernel:
+    build: .
+    # CI sets this to the exact image it built and starts Compose with
+    # `--no-build`, proving the same artifact that will be deployed.
+    image: ${HALOMEM_KERNEL_IMAGE:-halomem-kernel:local}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # This stack is explicitly for local development. The production image
+      # defaults NODE_ENV to production, which correctly requires TLS for a
+      # non-loopback Postgres DSN; Compose's private `db` service is plaintext.
+      NODE_ENV: development
+      # `db` is the compose service DNS name on the default network.
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:?run npm run env:init first}@db:5432/halomem
+      HALOMEM_PORT: 8787
+      HALOMEM_BOOTSTRAP_TOKEN: ${HALOMEM_BOOTSTRAP_TOKEN:?run npm run env:init first}
+      HALOMEM_SIGNING_KEY: ${HALOMEM_SIGNING_KEY:?run npm run env:init first}
+      HALOMEM_COLD_KEK: ${HALOMEM_COLD_KEK:?run npm run env:init first}
+      HALOMEM_SOURCE_CONFIG_KEK: ${HALOMEM_SOURCE_CONFIG_KEK:?run npm run env:init first}
+      HALOMEM_NANGO_CONNECT_API_KEY: ${HALOMEM_NANGO_CONNECT_API_KEY:-}
+      HALOMEM_NANGO_PROXY_API_KEY: ${HALOMEM_NANGO_PROXY_API_KEY:-}
+      HALOMEM_NANGO_INTEGRATIONS: ${HALOMEM_NANGO_INTEGRATIONS:-{}}
+      HALOMEM_NANGO_CONNECTION_LIMIT: ${HALOMEM_NANGO_CONNECTION_LIMIT:-10}
+      HALOMEM_NANGO_ENVIRONMENT_ID: ${HALOMEM_NANGO_ENVIRONMENT_ID:-}
+      HALOMEM_NOTION_CLIENT_ID: ${HALOMEM_NOTION_CLIENT_ID:-}
+      HALOMEM_NOTION_CLIENT_SECRET: ${HALOMEM_NOTION_CLIENT_SECRET:-}
+      HALOMEM_NOTION_SYNC_INTERVAL_SECONDS: ${HALOMEM_NOTION_SYNC_INTERVAL_SECONDS:-14400}
+      HALOMEM_AIRTABLE_CLIENT_ID: ${HALOMEM_AIRTABLE_CLIENT_ID:-}
+      HALOMEM_AIRTABLE_CLIENT_SECRET: ${HALOMEM_AIRTABLE_CLIENT_SECRET:-}
+      HALOMEM_AIRTABLE_SYNC_INTERVAL_SECONDS: ${HALOMEM_AIRTABLE_SYNC_INTERVAL_SECONDS:-14400}
+      HALOMEM_GOOGLE_DRIVE_CLIENT_ID: ${HALOMEM_GOOGLE_DRIVE_CLIENT_ID:-}
+      HALOMEM_GOOGLE_DRIVE_CLIENT_SECRET: ${HALOMEM_GOOGLE_DRIVE_CLIENT_SECRET:-}
+      HALOMEM_SLACK_CLIENT_ID: ${HALOMEM_SLACK_CLIENT_ID:-}
+      HALOMEM_SLACK_CLIENT_SECRET: ${HALOMEM_SLACK_CLIENT_SECRET:-}
+      HALOMEM_SLACK_SIGNING_SECRET: ${HALOMEM_SLACK_SIGNING_SECRET:-}
+      HALOMEM_MODEL_CREDENTIAL_KEK: ${HALOMEM_MODEL_CREDENTIAL_KEK:?run npm run env:init first}
+      HALOMEM_MODEL_ALLOWED_HOSTS: ${HALOMEM_MODEL_ALLOWED_HOSTS:-}
+      HALOMEM_PUBLIC_URL: ${HALOMEM_PUBLIC_URL:-http://localhost:8787}
+      HALOMEM_HALO_AGENTS_URL: ${HALOMEM_HALO_AGENTS_URL:-}
+      HALOMEM_HALO_AGENTS_SSO_SECRET: ${HALOMEM_HALO_AGENTS_SSO_SECRET:-}
+      HALOMEM_SECURE_COOKIES: ${HALOMEM_SECURE_COOKIES:-false}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      HALOMEM_SSO_EMAIL_DELIVERY_READY: ${HALOMEM_SSO_EMAIL_DELIVERY_READY:-false}
+    ports:
+      - "8787:8787"
+    volumes:
+      - halomem-knowledge:/app/knowledge
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  halomem-pgdata:
+  halomem-knowledge:

@@ -1,0 +1,20 @@
+# Gitleaks configuration.
+#
+# The kernel test suite is hermetic by contract: fixtures use
+# deterministic FAKE credentials (bot tokens like "123456:telegram-bot-token",
+# route keys, sealed-envelope test material) that trip entropy-based rules but
+# are public by design. Real secrets are banned from the repo everywhere,
+# including tests — that rule is enforced in review; this allowlist only stops
+# the scanner from failing CI on obviously synthetic test material.
+#
+# Everything outside kernel/test/ remains fully scanned with the default rules.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Hermetic kernel test fixtures — deterministic fake credentials"
+paths = [
+  '''kernel/test/.*\.test\.ts''',
+  '''kernel/test/fixtures/.*''',
+]

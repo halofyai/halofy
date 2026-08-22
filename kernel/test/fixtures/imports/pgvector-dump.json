@@ -1,0 +1,40 @@
+[
+  {
+    "id": 5001,
+    "content": "The Anvil Pro cordless drill ships with a two-year manufacturer warranty covering motor and battery defects.",
+    "metadata": {
+      "collection": "product_facts",
+      "embedding_model": "text-embedding-3-small"
+    }
+  },
+  {
+    "id": 5002,
+    "document": "Bulk orders over 500 units qualify for tiered volume pricing; contact the sales desk for a custom quote.",
+    "metadata": {
+      "collection": "sales_facts"
+    }
+  },
+  {
+    "id": "row-5003",
+    "text": "The warehouse in Reno fulfills all west-coast orders and typically dispatches same-day for orders placed before 2pm PT.",
+    "metadata": {
+      "collection": "ops_facts",
+      "region": "us-west"
+    }
+  },
+  {
+    "id": 5004,
+    "content": "Support hours are Monday through Friday, 8am to 6pm Pacific Time, excluding US federal holidays.",
+    "metadata": {
+      "collection": "support_facts"
+    }
+  },
+  {
+    "id": 5005,
+    "content": "",
+    "metadata": {
+      "collection": "noise",
+      "note": "empty content - importer must skip this row"
+    }
+  }
+]

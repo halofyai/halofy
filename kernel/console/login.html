@@ -1,0 +1,909 @@
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sign in &middot; Halofy</title>
+<link rel="icon" href="assets/marks/halofy-mark-green.png" />
+<link rel="stylesheet" href="app.css?v=20260821-1" />
+
+<main class="auth-shell">
+  <div class="auth-frame">
+    <section class="auth-story" aria-label="Halo Mem overview">
+      <div class="auth-story-brand">
+        <img src="assets/marks/halofy-mark-white.png" alt="" aria-hidden="true" />
+        <div><b>Halofy</b></div>
+      </div>
+
+      <!-- Decorative only: three lanes of tools streaming horizontally past a
+           fixed Halo mark - the memory layer everything flows through. Each
+           lane holds the same set of chips twice and slides exactly one set
+           width, so the loop is seamless with no JavaScript; login.html keeps
+           exactly one inline script, the auth flow below. Marks come from the
+           logo CDN the console already allow-lists in its CSP, so a chip whose
+           mark fails to load stays an empty glass circle. -->
+      <div class="auth-stream" aria-hidden="true">
+        <div class="auth-stream-lane auth-stream-lane--edge">
+          <div class="auth-stream-belt">
+            <span class="auth-stream-set">
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/notion/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/googledrive/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/github/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/linear/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/dropbox/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/jira/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/confluence/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/box/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/airtable/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/trello/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/zendesk/c7d7b2" alt="" /></span>
+            </span>
+            <span class="auth-stream-set">
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/notion/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/googledrive/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/github/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/linear/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/dropbox/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/jira/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/confluence/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/box/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/airtable/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/trello/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/zendesk/c7d7b2" alt="" /></span>
+            </span>
+          </div>
+        </div>
+
+        <div class="auth-stream-lane auth-stream-lane--main">
+          <div class="auth-stream-belt">
+            <span class="auth-stream-set">
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/claude/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/cursor/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/modelcontextprotocol/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/googlegemini/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/vscodium/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/jetbrains/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/obsidian/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/docker/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/npm/c7d7b2" alt="" /></span>
+            </span>
+            <span class="auth-stream-set">
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/claude/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/cursor/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/modelcontextprotocol/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/googlegemini/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/vscodium/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/jetbrains/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/obsidian/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/docker/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/npm/c7d7b2" alt="" /></span>
+            </span>
+          </div>
+        </div>
+
+        <div class="auth-stream-lane auth-stream-lane--edge">
+          <div class="auth-stream-belt">
+            <span class="auth-stream-set">
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/gmail/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/postgresql/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/figma/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/googlecalendar/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/supabase/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/mongodb/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/snowflake/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/redis/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/sentry/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/intercom/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/hubspot/c7d7b2" alt="" /></span>
+            </span>
+            <span class="auth-stream-set">
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/gmail/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/postgresql/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/figma/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/googlecalendar/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/supabase/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/mongodb/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/snowflake/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/redis/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/sentry/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/intercom/c7d7b2" alt="" /></span>
+              <span class="auth-stream-chip"><img src="https://cdn.simpleicons.org/hubspot/c7d7b2" alt="" /></span>
+            </span>
+          </div>
+        </div>
+
+        <span class="auth-stream-glow"></span>
+        <span class="auth-stream-core">
+          <img src="assets/marks/halofy-mark-white.png" alt="" />
+        </span>
+      </div>
+
+      <div class="auth-story-copy">
+        <h2><span>Every agent starts with</span><span>the right context.</span></h2>
+      </div>
+    </section>
+
+    <div class="card auth-card">
+
+    <!-- Pending state for every auth hop (first paint, the Google round trip,
+         the kernel session exchange). The fabric is decorative and mounted by
+         console/fabric.js; the message node is the accessible status and the
+         only thing the auth flow below writes to. -->
+    <div class="auth-loading" id="auth-loading">
+      <div class="fabric" data-fabric></div>
+      <p class="fabric-status" id="auth-loading-msg" role="status" aria-live="polite">Loading&hellip;</p>
+    </div>
+
+    <!-- Email confirmation pending (new Supabase account). -->
+    <div id="sso-pending" hidden>
+      <h1 id="pending-title" tabindex="-1">Check your email</h1>
+      <div class="sub" role="status" aria-live="polite">If account creation is available for this address and delivery succeeds, check the inbox and spam folder for a confirmation link sent to <b id="pending-email"></b>.</div>
+      <div class="auth-form">
+        <div class="hint auth-status" id="pending-status" role="status"></div>
+        <button class="btn btn--outline auth-submit" type="button" id="resend-btn">Resend confirmation</button>
+        <button type="button" class="auth-link" id="pending-back">Back to sign in</button>
+      </div>
+    </div>
+
+    <!-- Forgot password. -->
+    <div id="sso-forgot" hidden>
+      <h1 id="forgot-title" tabindex="-1">Reset your password</h1>
+      <div class="sub">Enter your email to request a reset link.</div>
+      <form class="auth-form" id="forgot-form" novalidate>
+        <div class="field">
+          <label for="forgot-email">Email</label>
+          <input class="input" type="email" id="forgot-email" autocomplete="email" required />
+        </div>
+        <div class="hint auth-status" id="forgot-status" role="status"></div>
+        <button class="btn btn--solid auth-submit" type="submit" id="forgot-submit">Send reset link</button>
+        <button type="button" class="auth-link" id="forgot-back">Back to sign in</button>
+      </form>
+    </div>
+
+    <!-- Recovery landing (arrived from a reset email): choose a new password. -->
+    <div id="sso-recovery" hidden>
+      <h1 id="recovery-title" tabindex="-1">Choose a new password</h1>
+      <div class="sub">Set a new password.</div>
+      <form class="auth-form" id="recovery-form" novalidate>
+        <div class="field">
+          <label for="recovery-password">New password</label>
+          <input class="input" type="password" id="recovery-password" autocomplete="new-password" minlength="8" required />
+        </div>
+        <div class="hint auth-error" id="recovery-error" role="alert"></div>
+        <button class="btn btn--solid auth-submit" type="submit" id="recovery-submit">Set password &amp; sign in</button>
+      </form>
+    </div>
+
+    <!-- One entry point for every person. The server resolves membership and
+         role; the browser only selects an authentication method. -->
+    <form class="auth-form" id="login-form" novalidate hidden>
+      <h1 id="native-title" tabindex="-1">Sign in</h1>
+      <div class="sub" id="auth-sub">Access your workspace.</div>
+      <div class="auth-tabs" role="tablist" aria-label="Choose sign in or account creation">
+        <button type="button" class="auth-tab is-active" id="tab-signin" role="tab" aria-selected="true">Sign in</button>
+        <button type="button" class="auth-tab" id="tab-signup" role="tab" aria-selected="false">Create account</button>
+      </div>
+      <!-- Providers lead, credentials follow: the fastest path is the one a
+           returning operator sees first, and the divider collapses on its own
+           (:has) when neither provider is configured for this deployment. -->
+      <button type="button" class="google-signin" id="sso-toggle" hidden aria-label="Sign in with Google">
+        <svg class="google-signin__mark" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+          <path fill="#4285F4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.482h4.844a4.14 4.14 0 0 1-1.797 2.715v2.258h2.909c1.702-1.567 2.684-3.874 2.684-6.614Z"/>
+          <path fill="#34A853" d="M9 18c2.43 0 4.468-.806 5.956-2.181l-2.91-2.258c-.806.54-1.835.859-3.046.859-2.344 0-4.328-1.585-5.037-3.714H.956v2.332A9 9 0 0 0 9 18Z"/>
+          <path fill="#FBBC05" d="M3.963 10.706A5.41 5.41 0 0 1 3.682 9c0-.592.102-1.168.281-1.706V4.962H.956A9 9 0 0 0 0 9c0 1.452.347 2.827.956 4.038l3.007-2.332Z"/>
+          <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.441 1.346l2.581-2.582C13.464.892 11.426 0 9 0A9 9 0 0 0 .956 4.962l3.007 2.332C4.672 5.165 6.656 3.58 9 3.58Z"/>
+        </svg>
+        <span id="sso-toggle-label">Sign in with Google</span>
+      </button>
+      <button type="button" class="google-signin" id="github-signin" hidden aria-label="Sign in with GitHub">
+        <svg class="google-signin__mark" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+        </svg>
+        <span>Sign in with GitHub</span>
+      </button>
+      <div id="email-auth">
+        <div class="auth-divider auth-divider--providers" role="separator"><span>or</span></div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input class="input" type="email" id="email" name="email" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input class="input" type="password" id="password" name="password" autocomplete="current-password" required />
+        </div>
+        <button type="button" class="auth-link" id="forgot-link" hidden>Forgot password?</button>
+        <button class="btn btn--solid auth-submit" type="submit" id="submit">Sign in via email</button>
+      </div>
+      <div class="hint auth-status sr-only" id="email-availability" role="status"></div>
+      <div class="hint auth-error" id="login-error" role="alert"></div>
+      <div class="auth-terms sr-only">By continuing, you agree to Halofy's Terms of Service and Privacy Policy.</div>
+    </form>
+
+    <form class="auth-form" id="invite-form" novalidate hidden>
+      <h2>Accept invitation</h2>
+      <div class="sub">Choose a password for this invite.</div>
+      <div class="field">
+        <label for="invite-password">New password</label>
+        <input class="input" type="password" id="invite-password" autocomplete="new-password" minlength="12" required aria-describedby="invite-password-hint" />
+        <div class="hint" id="invite-password-hint">At least 12 characters.</div>
+      </div>
+      <div class="hint auth-error" id="invite-error" role="alert"></div>
+      <button class="btn btn--solid auth-submit" type="submit" id="invite-submit">Activate account</button>
+    </form>
+
+    <form class="auth-form" id="organization-signup" novalidate hidden>
+      <h1 id="organization-signup-title" tabindex="-1">Create your workspace</h1>
+      <div class="sub">Signed in as <b id="organization-signup-email"></b>.</div>
+      <div class="field">
+        <label for="signup-display-name">Your name</label>
+        <input class="input" id="signup-display-name" name="displayName" autocomplete="name" maxlength="80" placeholder="Your full name" required />
+      </div>
+      <div class="field">
+        <label for="organization-name">Organization name</label>
+        <input class="input" id="organization-name" name="organizationName" autocomplete="organization" minlength="2" maxlength="100" placeholder="Acme Labs" required />
+      </div>
+      <div class="hint auth-error" id="organization-signup-error" role="alert"></div>
+      <button class="btn btn--solid auth-submit" type="submit" id="organization-signup-submit">Create your workspace</button>
+      <button type="button" class="auth-link" id="organization-signup-back">Back to sign in</button>
+    </form>
+
+    </div>
+  </div>
+</main>
+
+<script>
+  (function () {
+    "use strict";
+    var LOGIN_PATH = "/console/login";
+    var $ = function (id) { return document.getElementById(id); };
+    function show(node) { node.hidden = false; }
+    function hide(node) { node.hidden = true; }
+    function setMsg(node, msg) {
+      node.textContent = msg || "";
+      node.style.display = msg ? "block" : "none";
+    }
+    // The pending view is a fabric plus a status line; only the line is text.
+    function setLoading(msg) { $("auth-loading-msg").textContent = msg; }
+
+    var cfg = null; // { enabled, url, anonKey, emailDeliveryReady }
+    var mode = "sign_in"; // sign_in | sign_up
+    var recoveryToken = null;
+    var emailDeliveryReady = false;
+    var githubReady = false;
+
+    // ---- generic fetch helpers ---------------------------------------------
+
+    function gotrue(path, options) {
+      options = options || {};
+      var headers = { apikey: cfg.anonKey, "content-type": "application/json" };
+      if (options.bearer) headers.authorization = "Bearer " + options.bearer;
+      return fetch(cfg.url + "/auth/v1" + path, {
+        method: options.method || "POST",
+        headers: headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+      }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          return { status: res.status, data: data };
+        });
+      });
+    }
+
+    function gotrueError(data, fallback) {
+      var msg = (data && (data.error_description || data.msg || data.message)) || "";
+      if (/invalid login credentials/i.test(msg)) return "The email or password is incorrect.";
+      if (/rate.?limit|too many/i.test(msg)) return "Too many attempts. Please wait a moment and try again.";
+      if (/already registered|already exists/i.test(msg)) return "This email is already registered. Sign in instead.";
+      if (/should be at least|password/i.test(msg)) return msg;
+      return msg || fallback;
+    }
+
+    // Post-login bounce fence: honor ?next= only when it is a same-origin PATH
+    // on the allow-list — the kernel's own OAuth authorize endpoint
+    // (CONTRACTS-OAUTH-CONNECT OA8) or the whitelabel chat page, exactly
+    // "/chat". Anything else — schemes, hosts, protocol-relative values, other
+    // paths — falls back to the console. This is the open-redirect fence, and
+    // it must stay in agreement with safeConsentReturn() in
+    // src/http/console.ts, which enforces the same rule server-side.
+    var CONSENT_NEXT_KEY = "halomem.consent-next";
+
+    function safeNext(value) {
+      if (typeof value !== "string" || value.length > 2048) return "";
+      if (value.indexOf("//") === 0) return "";
+      if (value === "/chat") return value;
+      return value.indexOf("/oauth/authorize?") === 0 ? value : "";
+    }
+
+    // A provider sign-in leaves this page entirely (Supabase for Google, the
+    // kernel's own route for GitHub) and returns to a bare /console/login, so
+    // the ?next= in the address bar is gone by the time we can act on it. Stash
+    // it before leaving. Without this the user signs in successfully, lands in
+    // the console, and the connector that sent them here never gets its code.
+    function stashConsentNext() {
+      var next = safeNext(new URLSearchParams(window.location.search).get("next"));
+      if (!next) return "";
+      try { window.sessionStorage.setItem(CONSENT_NEXT_KEY, next); } catch (err) { /* private mode */ }
+      return next;
+    }
+
+    function takeConsentNext() {
+      var stashed = "";
+      try {
+        stashed = window.sessionStorage.getItem(CONSENT_NEXT_KEY) || "";
+        window.sessionStorage.removeItem(CONSENT_NEXT_KEY);
+      } catch (err) { stashed = ""; }
+      return safeNext(stashed);
+    }
+
+    function postLoginTarget() {
+      // The live query wins; the stash covers the provider round trip.
+      return safeNext(new URLSearchParams(window.location.search).get("next")) ||
+        takeConsentNext() ||
+        "/console/";
+    }
+
+    function exchange(accessToken, errNode) {
+      return fetch("/auth/sso", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ access_token: accessToken }),
+      }).then(function (res) {
+        if (res.status === 200) { window.location.replace(postLoginTarget()); return true; }
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (res.status === 202 && data.code === "onboarding_required") {
+            return loadOrganizationSignup(errNode);
+          } else if (res.status === 403 && data.code === "no_console_access") {
+            setMsg(errNode, "You're signed in, but this email has no control-room access yet. Ask your administrator for an invitation.");
+          } else if (res.status === 429) {
+            setMsg(errNode, "Too many attempts. Please wait a moment and try again.");
+          } else {
+            setMsg(errNode, "We could not sign you in. Please try again.");
+          }
+          return false;
+        });
+      }).catch(function () {
+        setMsg(errNode, "Something went wrong. Please try again.");
+        return false;
+      });
+    }
+
+    // ---- view switching ----------------------------------------------------
+
+    var views = ["auth-loading", "sso-pending", "sso-forgot", "sso-recovery", "login-form", "organization-signup"];
+    function showView(id) {
+      views.forEach(function (v) { hide($(v)); });
+      show($(id));
+      var focusIds = {
+        "sso-pending": "pending-title",
+        "sso-forgot": "forgot-title",
+        "sso-recovery": "recovery-title",
+        "login-form": "native-title",
+        "organization-signup": "organization-signup-title"
+      };
+      var focusTarget = focusIds[id] ? $(focusIds[id]) : null;
+      if (focusTarget) focusTarget.focus();
+    }
+
+    function setOrganizationSignupMarker(active) {
+      history.replaceState(null, "", active ? LOGIN_PATH + "?signup=organization" : LOGIN_PATH);
+    }
+
+    function showOrganizationSignup(pending) {
+      $("organization-signup-email").textContent = pending.email || "your verified account";
+      $("signup-display-name").value = "";
+      $("organization-name").value = "";
+      setMsg($("organization-signup-error"), "");
+      setOrganizationSignupMarker(true);
+      showView("organization-signup");
+      $("signup-display-name").focus();
+    }
+
+    function loadOrganizationSignup(errNode) {
+      setLoading("Preparing your workspace…");
+      showView("auth-loading");
+      return fetch("/auth/signup", { credentials: "include" })
+        .then(function (res) {
+          if (res.status !== 200) throw new Error("signup authority unavailable");
+          return res.json();
+        })
+        .then(function (pending) {
+          showOrganizationSignup(pending || {});
+          return true;
+        })
+        .catch(function () {
+          setOrganizationSignupMarker(false);
+          setMsg(errNode, "Your secure signup session expired. Continue with Google to try again.");
+          return false;
+        });
+    }
+
+    function completeOrganizationSignup(ev) {
+      ev.preventDefault();
+      var displayName = $("signup-display-name").value.trim();
+      var organizationName = $("organization-name").value.trim();
+      var button = $("organization-signup-submit");
+      var error = $("organization-signup-error");
+      setMsg(error, "");
+      if (!displayName) {
+        setMsg(error, "Enter your name.");
+        $("signup-display-name").focus();
+        return;
+      }
+      if (organizationName.length < 2) {
+        setMsg(error, "Enter an organization name with at least 2 characters.");
+        $("organization-name").focus();
+        return;
+      }
+      button.disabled = true;
+      fetch("/auth/signup", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ displayName: displayName, organizationName: organizationName }),
+      })
+        .then(function (res) {
+          if (res.status === 201) {
+            window.location.replace("/console/");
+            return;
+          }
+          button.disabled = false;
+          if (res.status === 401) {
+            setMsg(error, "Your secure signup session expired. Continue with Google to try again.");
+          } else if (res.status === 409) {
+            setMsg(error, "An account already exists for this email. Return to sign in.");
+          } else if (res.status === 429) {
+            setMsg(error, "Too many attempts. Please wait a moment and try again.");
+          } else {
+            setMsg(error, "We could not create your workspace. Please try again.");
+          }
+          button.focus();
+        })
+        .catch(function () {
+          button.disabled = false;
+          setMsg(error, "Something went wrong. Please try again.");
+          button.focus();
+        });
+    }
+
+    function setMode(next) {
+      mode = next;
+      var signup = next === "sign_up";
+      $("tab-signin").classList.toggle("is-active", !signup);
+      $("tab-signup").classList.toggle("is-active", signup);
+      $("tab-signin").setAttribute("aria-selected", String(!signup));
+      $("tab-signup").setAttribute("aria-selected", String(signup));
+      $("native-title").textContent = signup ? "Create your account" : "Sign in";
+      $("auth-sub").textContent = signup
+        ? (emailDeliveryReady
+          ? "Continue with Google or your business email."
+          : "Continue with Google to verify your identity.")
+        : "Access your workspace.";
+      $("sso-toggle-label").textContent = signup ? "Continue with Google" : "Sign in with Google";
+      $("sso-toggle").setAttribute("aria-label", signup ? "Continue with Google" : "Sign in with Google");
+      $("password").autocomplete = signup ? "new-password" : "current-password";
+      $("forgot-link").hidden = !emailDeliveryReady || signup;
+      $("email-auth").hidden = signup && !emailDeliveryReady;
+      $("github-signin").hidden = signup || !githubReady;
+      $("submit").textContent = signup ? "Create account with email" : "Sign in via email";
+      setMsg($("login-error"), "");
+    }
+
+    // ---- SSO flows ---------------------------------------------------------
+
+    function googleLogin() {
+      // Supabase only redirects to allow-listed URLs, so redirect_to stays the
+      // bare login path and the consent bounce rides sessionStorage instead.
+      stashConsentNext();
+      var redirect = window.location.origin + LOGIN_PATH;
+      window.location.href =
+        cfg.url + "/auth/v1/authorize?provider=google&redirect_to=" + encodeURIComponent(redirect);
+    }
+
+    function emailSubmit(ev) {
+      ev.preventDefault();
+      var email = $("email").value.trim().toLowerCase();
+      var password = $("password").value;
+      var btn = $("submit");
+      var error = $("login-error");
+      setMsg(error, "");
+      if (!email || !password) return;
+      btn.disabled = true;
+
+      if (mode === "sign_up") {
+        if (!emailDeliveryReady) {
+          btn.disabled = false;
+          setMsg(error, "Email account creation is temporarily unavailable. Continue with Google.");
+          btn.focus();
+          return;
+        }
+        // Confirmation mail lands back on a bare /console/login too.
+        stashConsentNext();
+        var redirect = encodeURIComponent(window.location.origin + LOGIN_PATH);
+        gotrue("/signup?redirect_to=" + redirect, { body: { email: email, password: password } })
+          .then(function (res) {
+            btn.disabled = false;
+            if (res.status === 200 && res.data && res.data.access_token) {
+              // Auto-confirm project: a session came straight back.
+              btn.disabled = true;
+              return exchange(res.data.access_token, error).then(function (ok) {
+                if (!ok) {
+                  btn.disabled = false;
+                  btn.focus();
+                }
+              });
+            }
+            if (res.status === 200) {
+              $("pending-email").textContent = email;
+              setMsg($("pending-status"), "");
+              showView("sso-pending");
+              return;
+            }
+            setMsg(error, gotrueError(res.data, "We could not create the account. Please try again."));
+            btn.focus();
+          })
+          .catch(function () {
+            btn.disabled = false;
+            setMsg(error, "Something went wrong. Please try again.");
+            btn.focus();
+          });
+        return;
+      }
+
+      // Roles and membership are server-resolved. Try the kernel credential
+      // store first, then the hosted provider, without exposing that split.
+      fetch("/auth/login", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: email, password: password }),
+      }).then(function (nativeRes) {
+        if (nativeRes.status === 200) {
+          window.location = postLoginTarget();
+          return null;
+        }
+        if (nativeRes.status !== 401 || !cfg || !emailDeliveryReady) {
+          btn.disabled = false;
+          setMsg(error, nativeRes.status === 401
+            ? "Email or password is incorrect."
+            : "Something went wrong. Please try again.");
+          btn.focus();
+          return null;
+        }
+        return gotrue("/token?grant_type=password", { body: { email: email, password: password } });
+      })
+        .then(function (res) {
+          if (!res) return;
+          if (res.status === 200 && res.data && res.data.access_token) {
+            return exchange(res.data.access_token, error).then(function (ok) {
+              if (!ok) {
+                btn.disabled = false;
+                btn.focus();
+              }
+            });
+          }
+          btn.disabled = false;
+          var raw = (res.data && (res.data.error_description || res.data.msg)) || "";
+          if (/email not confirmed/i.test(raw)) {
+            $("pending-email").textContent = email;
+            setMsg($("pending-status"), "");
+            showView("sso-pending");
+            return;
+          }
+          setMsg(error, gotrueError(res.data, "Email or password is incorrect."));
+          btn.focus();
+        })
+        .catch(function () {
+          btn.disabled = false;
+          setMsg(error, "Something went wrong. Please try again.");
+          btn.focus();
+        });
+    }
+
+    function resendConfirmation() {
+      var email = $("pending-email").textContent;
+      var btn = $("resend-btn");
+      if (!emailDeliveryReady) {
+        setMsg($("pending-status"), "Email confirmation is temporarily unavailable. Continue with Google or contact your administrator.");
+        return;
+      }
+      btn.disabled = true;
+      var redirect = encodeURIComponent(window.location.origin + LOGIN_PATH);
+      gotrue("/resend?redirect_to=" + redirect, { body: { type: "signup", email: email } })
+        .then(function (res) {
+          btn.disabled = false;
+          if (res.status === 200) {
+            setMsg($("pending-status"), "If the account still needs confirmation and delivery succeeds, check the inbox for a new link.");
+            btn.focus();
+            return;
+          }
+          setMsg($("pending-status"), gotrueError(res.data, "We could not resend the confirmation email. Please try again."));
+          btn.focus();
+        })
+        .catch(function () {
+          btn.disabled = false;
+          setMsg($("pending-status"), "We could not resend the confirmation email. Please try again.");
+          btn.focus();
+        });
+    }
+
+    function forgotSubmit(ev) {
+      ev.preventDefault();
+      var email = $("forgot-email").value.trim().toLowerCase();
+      if (!email) return;
+      var btn = $("forgot-submit");
+      if (!emailDeliveryReady) {
+        setMsg($("forgot-status"), "Password reset email is temporarily unavailable. Continue with Google or contact your administrator.");
+        return;
+      }
+      btn.disabled = true;
+      var redirect = encodeURIComponent(window.location.origin + LOGIN_PATH);
+      gotrue("/recover?redirect_to=" + redirect, { body: { email: email } })
+        .then(function (res) {
+          btn.disabled = false;
+          if (res.status === 200) {
+            setMsg($("forgot-status"), "If an account exists and delivery succeeds, check the inbox for a reset link.");
+            btn.focus();
+            return;
+          }
+          setMsg($("forgot-status"), gotrueError(res.data, "We could not send a reset link. Please try again."));
+          btn.focus();
+        })
+        .catch(function () {
+          btn.disabled = false;
+          setMsg($("forgot-status"), "We could not send a reset link. Please try again.");
+          btn.focus();
+        });
+    }
+
+    function recoverySubmit(ev) {
+      ev.preventDefault();
+      var password = $("recovery-password").value;
+      var btn = $("recovery-submit");
+      setMsg($("recovery-error"), "");
+      if (!password || !recoveryToken) return;
+      btn.disabled = true;
+      gotrue("/user", { method: "PUT", bearer: recoveryToken, body: { password: password } })
+        .then(function (res) {
+          if (res.status !== 200) {
+            btn.disabled = false;
+            setMsg($("recovery-error"), gotrueError(res.data, "We could not set the password. The link may have expired."));
+            btn.focus();
+            return;
+          }
+          return exchange(recoveryToken, $("recovery-error")).then(function (ok) {
+            if (!ok) {
+              btn.disabled = false;
+              btn.focus();
+            }
+          });
+        })
+        .catch(function () {
+          btn.disabled = false;
+          setMsg($("recovery-error"), "Something went wrong. Please try again.");
+          btn.focus();
+        });
+    }
+
+    // ---- boot --------------------------------------------------------------
+
+    function parseHash() {
+      var hash = window.location.hash.replace(/^#/, "");
+      if (!hash) return {};
+      var params = new URLSearchParams(hash);
+      var out = {};
+      params.forEach(function (value, key) { out[key] = value; });
+      if (
+        out.access_token ||
+        out.refresh_token ||
+        out.provider_token ||
+        out.provider_refresh_token ||
+        out.error_description ||
+        out.error
+      ) {
+        // Never leave tokens sitting in the URL/history.
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+      return out;
+    }
+
+    // Scrub access tokens before any network request can fail or stall.
+    var authFragment = parseHash();
+
+    // Profile "Connect Google" round-trip. Supabase only redirects to
+    // allow-listed URLs, so the OAuth return lands HERE even when the user is
+    // already signed in and only wants to connect the account. The Profile
+    // screen leaves a one-shot marker; when it is present the token connects
+    // an account (POST /auth/identities/google) instead of minting a session,
+    // and the browser bounces straight back to the Profile screen.
+    var LINK_FLAG = "halomem.link-provider";
+    var linkProvider = null;
+    try {
+      linkProvider = window.sessionStorage.getItem(LINK_FLAG);
+      window.sessionStorage.removeItem(LINK_FLAG);
+    } catch (err) {
+      linkProvider = null;
+    }
+    var linkReturn =
+      linkProvider === "google" &&
+      Boolean(authFragment.access_token || authFragment.error || authFragment.error_description);
+
+    function finishGoogleLink(accessToken) {
+      setLoading("Connecting Google…");
+      showView("auth-loading");
+      function back(marker) { window.location.replace("/console/#settings?" + marker); }
+      if (!accessToken) { back("error=google"); return; }
+      fetch("/auth/identities/google", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ access_token: accessToken }),
+      })
+        .then(function (res) {
+          if (res.status === 200) { back("linked=google"); return; }
+          back("error=" + (res.status === 409 ? "google_conflict" : "google"));
+        })
+        .catch(function () { back("error=google"); });
+    }
+
+    function bootSso() {
+      var fragment = authFragment;
+      if (fragment.access_token && fragment.type === "recovery") {
+        recoveryToken = fragment.access_token;
+        showView("sso-recovery");
+        return;
+      }
+      if (fragment.access_token) {
+        setLoading("Signing you in…");
+        showView("auth-loading");
+        exchange(fragment.access_token, $("login-error")).then(function (ok) {
+          if (!ok) {
+            showView("login-form");
+          }
+        });
+        return;
+      }
+      setMode("sign_in");
+      showView("login-form");
+      if (fragment.error_description || fragment.error) {
+        setMsg($("login-error"), fragment.error_description || "Sign-in was cancelled or failed. Please try again.");
+      }
+    }
+
+    var pageParams = new URLSearchParams(window.location.search);
+    var inviteToken = pageParams.get("invite");
+    var oauthError = pageParams.get("error");
+    var organizationSignupRequested = pageParams.get("signup") === "organization";
+    if (oauthError && oauthError.indexOf("github") === 0) {
+      setMsg($("login-error"), oauthError === "github_no_account"
+        ? "That GitHub account is connected to a disabled account. Contact your administrator."
+        : "GitHub sign-in failed. Please try again.");
+    }
+    if (linkReturn) {
+      finishGoogleLink(authFragment.access_token);
+    } else if (inviteToken) {
+      hide($("auth-loading"));
+      show($("invite-form"));
+    } else {
+      fetch("/auth/sso/config", { credentials: "include" })
+        .then(function (res) { return res.json(); })
+        .catch(function () { return { enabled: false }; })
+        .then(function (config) {
+          cfg = config && config.enabled && config.url && config.anonKey ? config : null;
+          githubReady = config && config.github === true;
+          if (githubReady) show($("github-signin"));
+          if (cfg) {
+            emailDeliveryReady = cfg.emailDeliveryReady === true;
+            $("forgot-link").hidden = !emailDeliveryReady;
+            $("sso-toggle").hidden = false;
+            $("sso-toggle-label").textContent = "Sign in with Google";
+            $("sso-toggle").setAttribute("aria-label", "Sign in with Google");
+            if (organizationSignupRequested && !authFragment.access_token) {
+              loadOrganizationSignup($("login-error")).then(function (ok) {
+                if (!ok) {
+                  showView("login-form");
+                }
+              });
+            } else if (
+              authFragment.access_token ||
+              authFragment.error_description ||
+              authFragment.error
+            ) {
+              bootSso();
+            } else {
+              showView("login-form");
+            }
+            if (!emailDeliveryReady && !recoveryToken) {
+              setMsg($("email-availability"), "Hosted email sign-in, account creation, and password reset are temporarily unavailable. Use Google or email and password.");
+            }
+          } else if (organizationSignupRequested) {
+            loadOrganizationSignup($("login-error")).then(function (ok) {
+              if (!ok) {
+                showView("login-form");
+              }
+            });
+          } else {
+            showView("login-form");
+          }
+        });
+    }
+
+    // ---- SSO listeners -----------------------------------------------------
+
+    $("github-signin").addEventListener("click", function () {
+      // The GitHub callback lands on /console/ server-side and never re-enters
+      // this page, so the consent bounce travels in the state cookie, not
+      // sessionStorage. The server re-validates it (safeConsentReturn).
+      var next = safeNext(new URLSearchParams(window.location.search).get("next"));
+      window.location.href = "/auth/github" + (next ? "?next=" + encodeURIComponent(next) : "");
+    });
+    $("tab-signin").addEventListener("click", function () { setMode("sign_in"); });
+    $("tab-signup").addEventListener("click", function () {
+      if (!cfg) {
+        setMsg($("login-error"), "Account creation with Google is not available on this deployment.");
+        $("tab-signup").focus();
+        return;
+      }
+      setMode("sign_up");
+    });
+    $("forgot-link").addEventListener("click", function () {
+      if (!emailDeliveryReady) return;
+      $("forgot-email").value = $("email").value;
+      setMsg($("forgot-status"), "");
+      showView("sso-forgot");
+    });
+    $("forgot-back").addEventListener("click", function () { setMode("sign_in"); showView("login-form"); });
+    $("forgot-form").addEventListener("submit", forgotSubmit);
+    $("pending-back").addEventListener("click", function () { setMode("sign_in"); showView("login-form"); });
+    $("resend-btn").addEventListener("click", resendConfirmation);
+    $("recovery-form").addEventListener("submit", recoverySubmit);
+    $("sso-toggle").addEventListener("click", googleLogin);
+    $("organization-signup").addEventListener("submit", completeOrganizationSignup);
+    $("organization-signup-back").addEventListener("click", function () {
+      setOrganizationSignupMarker(false);
+      setMode("sign_in");
+      showView("login-form");
+    });
+
+    $("login-form").addEventListener("submit", emailSubmit);
+
+    $("invite-form").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var button = $("invite-submit");
+      var error = $("invite-error");
+      var password = $("invite-password").value;
+      // The form is novalidate, so minlength never fires — mirror the kernel's
+      // 12-character floor here instead of round-tripping to a 400.
+      if (password.length < 12) {
+        setMsg(error, "Password must be at least 12 characters.");
+        $("invite-password").focus();
+        return;
+      }
+      setMsg(error, "");
+      button.disabled = true;
+      fetch("/auth/invite/accept", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: inviteToken, password: password }),
+      }).then(function (res) {
+        button.disabled = false;
+        if (res.status === 200) { window.location = "/console/login"; return; }
+        // 400 is a rejected password, not a dead link — say which.
+        if (res.status === 400) {
+          res.json().then(function (body) {
+            setMsg(error, (body && body.error) || "That password was rejected.");
+          }).catch(function () {
+            setMsg(error, "That password was rejected.");
+          });
+          return;
+        }
+        setMsg(error, "This activation link is invalid, expired, or already used.");
+      }).catch(function () {
+        button.disabled = false;
+        setMsg(error, "Activation failed. Please try again.");
+      });
+    });
+
+  })();
+</script>
+
+<!-- Decorative: paints the Context Fabric into [data-fabric]. Deferred, and the
+     pending view still reads correctly if it never loads. -->
+<script type="module" src="fabric.js"></script>
+<script type="module" src="login-stream.js"></script>

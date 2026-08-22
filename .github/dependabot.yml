@@ -1,0 +1,120 @@
+version: 2
+
+# Weekly, grouped, and deliberately not same-day. `cooldown` holds a newly
+# published release for a week before Dependabot will propose it, which is the
+# cheapest available defence against a compromised release being pulled in
+# minutes after publication. Security advisories are exempt from cooldown and
+# still open immediately.
+
+updates:
+  - package-ecosystem: npm
+    directory: /kernel
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
+    cooldown:
+      default-days: 7
+    labels:
+      - dependencies
+      - kernel
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+      include: scope
+    groups:
+      typescript-toolchain:
+        patterns:
+          - typescript
+          - tsx
+          - "@types/*"
+          - vitest
+        update-types:
+          - minor
+          - patch
+      model-context-protocol:
+        patterns:
+          - "@modelcontextprotocol/*"
+        update-types:
+          - minor
+          - patch
+      database:
+        patterns:
+          - pg
+          - "@electric-sql/pglite"
+        update-types:
+          - minor
+          - patch
+      production-minor-and-patch:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      development-minor-and-patch:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /kernel/integrations/halomem-sync
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    labels:
+      - dependencies
+      - integrations
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    groups:
+      obsidian-plugin:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: docker
+    directory: /kernel
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 2
+    cooldown:
+      default-days: 7
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: "chore(docker)"
