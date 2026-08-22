@@ -95,7 +95,7 @@ describe("source scheduling lifecycle", () => {
     expect((await jobs.get(job.id))?.state).toBe("done");
   }, 30_000);
 
-  it("meters scheduled sync jobs and terminally fails work beyond the team allowance", async () => {
+  it("runs scheduled sync jobs without hosted allowances", async () => {
     const priorEnabled = process.env.HALOMEM_EARLY_ACCESS;
     const priorLimit = process.env.HALOMEM_EARLY_ACCESS_SOURCE_SYNC_LIMIT;
     process.env.HALOMEM_EARLY_ACCESS = "true";
@@ -123,14 +123,10 @@ describe("source scheduling lifecycle", () => {
 
       expect((await kernel.db.query(
         "SELECT units FROM early_access_usage WHERE feature = 'source_sync'",
-      )).rows).toEqual([{ units: 1 }]);
+      )).rows).toEqual([]);
       expect((await kernel.db.query("SELECT actor FROM early_access_members")).rows).toHaveLength(0);
       expect((await jobs.get(firstJob.id))?.state).not.toBe("failed");
-      expect(await jobs.get(secondJob.id)).toMatchObject({ state: "failed" });
-      expect((await kernel.db.query(
-        "SELECT last_error FROM durable_jobs WHERE id = $1",
-        [secondJob.id],
-      )).rows).toEqual([{ last_error: "early-access-quota_exhausted" }]);
+      expect((await jobs.get(secondJob.id))?.state).not.toBe("failed");
     } finally {
       if (priorEnabled === undefined) delete process.env.HALOMEM_EARLY_ACCESS;
       else process.env.HALOMEM_EARLY_ACCESS = priorEnabled;

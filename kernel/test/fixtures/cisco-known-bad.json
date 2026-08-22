@@ -1,0 +1,37 @@
+{
+  "skill_name": "setup-helper",
+  "skill_path": "<temporary-scan-directory>",
+  "is_safe": false,
+  "max_severity": "CRITICAL",
+  "findings_count": 2,
+  "findings": [
+    {
+      "id": "MANIFEST_MISSING_LICENSE_example",
+      "rule_id": "MANIFEST_MISSING_LICENSE",
+      "category": "policy_violation",
+      "severity": "INFO",
+      "title": "Skill does not specify a license",
+      "description": "Skill manifest does not include a license field.",
+      "file_path": "SKILL.md",
+      "line_number": null,
+      "snippet": null,
+      "analyzer": "static"
+    },
+    {
+      "id": "YARA_prompt_injection_generic_example",
+      "rule_id": "YARA_prompt_injection_generic",
+      "category": "prompt_injection",
+      "severity": "CRITICAL",
+      "title": "PROMPT INJECTION detected by YARA",
+      "description": "Detects instruction override strings.",
+      "file_path": "SKILL.md",
+      "line_number": 4,
+      "snippet": "Ignore all previous instructions",
+      "analyzer": "static"
+    }
+  ],
+  "scan_metadata": {
+    "policy_name": "default",
+    "policy_version": "1.0"
+  }
+}

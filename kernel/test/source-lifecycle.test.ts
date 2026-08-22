@@ -107,13 +107,12 @@ describe("source document lifecycle", () => {
     await expect(kernel.memRead({ id: oldId }, owner)).resolves.toMatchObject({
       found: false,
     });
-    // M6: the sync also minted one pointer-catalog fact (CONTRACTS-M6 row A),
-    // which is a real, visible L2 fact — stats and fragmentation see the one
-    // active document fact PLUS the source's pointer.
+    // The standalone source lane stores the active document fact without a
+    // federation pointer catalog.
     const stats = await kernel.memStats("life/source-tests", owner);
-    expect(stats.l2Count).toBe(2);
+    expect(stats.l2Count).toBe(1);
     const fragmented = await kernel.runFragmentation("life/source-tests", owner);
-    expect(fragmented.factCount).toBe(2);
+    expect(fragmented.factCount).toBe(1);
 
     const audits = await kernel.db.query(
       `SELECT memory_id, detail FROM audit_log
@@ -221,7 +220,7 @@ describe("source document lifecycle", () => {
     await rm(otherCorpus, { recursive: true, force: true });
   });
 
-  it("disconnecting a backend retires all of its derived memory and routing pointers", async () => {
+  it("disconnecting a backend retires all of its derived memory", async () => {
     const disconnectCorpus = await mkdtemp(join(tmpdir(), "halomem-source-disconnect-"));
     try {
       await writeFile(
@@ -239,7 +238,7 @@ describe("source document lifecycle", () => {
         [JSON.stringify([{ sourceId: source.id }])],
       );
       expect(before.rows.some((row) => row.type === "fact")).toBe(true);
-      expect(before.rows.some((row) => row.type === "pointer")).toBe(true);
+      expect(before.rows.some((row) => row.type === "pointer")).toBe(false);
 
       const disconnected = await kernel.pauseSource(source.id, owner);
       expect(disconnected.lifecycleState).toBe("paused");

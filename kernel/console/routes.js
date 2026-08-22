@@ -12,19 +12,14 @@ export const SCREEN_ROUTES = Object.freeze({
   s7: "knowledgereview",
   s8: "audit",
   s9: "retrievalquality",
-  s10: "assistant",
   s11: "conflicts",
-  s12: "aimodels",
   s13: "teams",
   s14: "agentconnections",
-  s15: "usageanalytics",
   s16: "skills",
   s17: "connectedapps",
   s18: "settings",
   s19: "alerts",
   s20: "export",
-  s21: "channels",
-  s22: "billing",
 });
 
 const ROUTE_SCREENS = Object.freeze(

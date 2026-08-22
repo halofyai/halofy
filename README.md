@@ -1,413 +1,235 @@
-# Halofy
+<p align="center">
+  <img src=".github/assets/halofy-hero.svg" alt="Halofy — memory your agents can account for" width="100%" />
+</p>
 
-**An organizational memory kernel for AI agent fleets.**
+<p align="center">
+  <strong>An open organizational-memory kernel for AI agent fleets.</strong><br />
+  Custody, access control, provenance, audit, and signed erasure—with retrieval delegated to swappable read-only drivers.
+</p>
 
-Halofy owns *custody* of memory — the write path, placement across tiers,
-movement, and governance — and delegates *retrieval* to swappable open-source
-engines mounted as read-only cartridges.
+<p align="center">
+  <a href="#quickstart"><img alt="Get started" src="https://img.shields.io/badge/Get_started-B8FF63?style=for-the-badge&logo=rocket&logoColor=07130F&labelColor=B8FF63" /></a>
+  <a href="docs/architecture.md"><img alt="Architecture" src="https://img.shields.io/badge/Architecture-173B2C?style=for-the-badge&logo=readthedocs&logoColor=white" /></a>
+  <a href="docs/driver-kit.md"><img alt="Build a driver" src="https://img.shields.io/badge/Build_a_driver-245A43?style=for-the-badge&logo=dependabot&logoColor=white" /></a>
+  <a href="https://github.com/halofyai/halofy/discussions"><img alt="Discussions" src="https://img.shields.io/badge/Discussions-2F6F53?style=for-the-badge&logo=github&logoColor=white" /></a>
+</p>
 
-[![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-22.x-brightgreen.svg)](kernel/package.json)
-
-An agent fleet that shares memory needs answers to questions a vector store
-does not have opinions about: who is allowed to read this fact, what happened
-when it contradicted an older fact, which document it came from, who deleted
-it and can that deletion be proven. Halofy is the layer that answers those.
-It is a database schema, a write pipeline, an access-control rule, an
-append-only audit log, and a syscall surface — not a retriever.
-
-Retrieval is delegated on purpose and permanently (decision D1). The kernel
-ships a baseline retriever as a referee control lane, not as a moat.
-
----
-
-## What it does
-
-Each bullet is implemented in this repository at the path given.
-
-- **Memory syscalls over MCP and HTTP** — `mem_write`, `mem_write_status`,
-  `mem_read`, `mem_search`, `mem_assemble`, `mem_fault`, `mem_pin`,
-  `mem_unpin`, `mem_stats`, `mem_forget`, `mem_policy`, `mem_policy_ack`,
-  `mem_share`, `mem_manifest`.
-  (`kernel/src/syscalls/`, `kernel/src/mcp/tools.ts`)
-- **A custody write path**, not an upsert: extract → verify → resolve entities
-  → dedupe → supersede → record provenance → audit. A contradicting fact
-  *closes* the prior fact's validity interval and links to it. Nothing is ever
-  overwritten (D7). (`kernel/src/write/`)
-- **A tiered read path.** L2 is authoritative operational memory in
-  Postgres/pgvector; L3 is governed knowledge — encrypted, Git-versioned
-  markdown concepts. A context fault that L2 cannot answer above the relevance
-  floor pages in from L3 and records the fault.
-  (`kernel/src/fault/`, `kernel/src/cold/`)
-- **A hierarchical ACL enforced in the query layer**, never in callers, and
-  never with an unescaped `LIKE`. (`kernel/src/index/index.ts`)
-- **Append-only audit on every syscall** — including denied, miss, brownout,
-  and error outcomes (D4). Audit data is retrofit-impossible, so it is written
-  from the first call. (`kernel/src/audit/`)
-- **Signed erasure.** `mem_forget` hard-deletes matching rows, writes
-  tombstones, leaves the audit history intact, and mints an ed25519
-  `DeletionCertificate` that verifies offline. (`kernel/src/erasure/`)
-- **Retrieval driver cartridges** with a mechanically enforced import
-  boundary. A driver sees a `ScopedView` and nothing else; a static scan
-  rejects any reach into storage, the write path, or audit — including
-  `createRequire` and computed dynamic imports.
-  (`kernel/src/driver/`, `kernel/src/conformance/`)
-- **A frameworkless control room** — string-rendered, XSS-escaped, no build
-  step — for memory, sources, teams, policies, conflicts, audit, and export.
-  (`kernel/console/`)
-- **No telemetry and no phone-home.**
-  `grep -rE "posthog|segment\.io|amplitude|mixpanel" kernel/src` returns
-  nothing, and no Halofy endpoint appears anywhere under `kernel/src`. Across
-  the storage, write, retrieval and governance modules the only two source
-  files containing `fetch(` are `src/embed/index.ts` (the optional OpenAI
-  embedder) and `src/driver/mem0.ts` (the optional sidecar driver). Both are
-  off unless you configure them.
+<p align="center">
+  <a href="https://github.com/halofyai/halofy/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/halofyai/halofy/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="LICENSE"><img alt="AGPL-3.0-or-later" src="https://img.shields.io/badge/license-AGPL--3.0--or--later-245A43.svg" /></a>
+  <a href="kernel/package.json"><img alt="Node 22" src="https://img.shields.io/badge/node-22.x-339933.svg?logo=node.js&logoColor=white" /></a>
+  <img alt="Offline ready" src="https://img.shields.io/badge/offline-ready-B8FF63.svg?logo=lightning&logoColor=07130F" />
+  <img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-173B2C.svg" />
+</p>
 
 ---
+
+An agent fleet needs more than similarity search. It needs answers to harder
+questions: **who may read this fact, where did it come from, what happened when
+it contradicted an older fact, and can deletion be proven?** Halofy is the layer
+that answers those questions.
+
+It owns the memory lifecycle and keeps retrieval replaceable. The result is a
+kernel you can inspect, self-host, run offline, and connect over MCP or HTTP.
+
+## Why Halofy
+
+| Custody | Governance | Open retrieval |
+|---|---|---|
+| Writes follow one auditable path: extract → verify → dedupe → supersede → provenance. Facts are never silently overwritten. | Identity is resolved from credentials, ACLs are enforced in the repository layer, every syscall audits, and erasure produces an offline-verifiable certificate. | Drivers receive an ACL-scoped, read-only view and return ranked references. A six-check conformance kit enforces the boundary. |
+
+### What ships in this repository
+
+- **Memory syscalls over MCP and HTTP:** `mem_write`, `mem_read`, `mem_search`,
+  `mem_assemble`, `mem_fault`, `mem_stats`, `mem_forget`, policy, sharing,
+  pinning, export, and manifest operations.
+- **A bi-temporal custody write path:** provenance, entity resolution, exact and
+  semantic dedupe, supersedence chains, and append-only audit.
+- **Two storage tiers:** Postgres/pgvector for operational memory and encrypted,
+  Git-versioned knowledge for the cold tier. Embedded PGlite is the zero-setup
+  local default.
+- **A frameworkless control room:** memory, sources, policies, conflicts,
+  retrieval quality, teams, audit, alerts, skills, connected apps, and export.
+- **Four public connectors:** filesystem, Postgres, Obsidian, and manual CSV
+  import—all feeding the same governed write path.
+- **A hermetic test lane:** embedded PGlite, deterministic `StubLlm`,
+  `HashEmbedder`, and zero network access.
 
 ## Quickstart
 
-### 1. The whole story, with no credentials
-
-This is the part worth checking first. Halofy runs a complete end-to-end
-memory story with **no API key, no database server, no network, and no model
-download.** Not a mock — the real kernel, on embedded PGlite with pgvector, a
-deterministic hash embedder, and a deterministic stub LLM.
+### Run the complete offline story
 
 ```bash
 git clone https://github.com/halofyai/halofy.git
-cd halomem/kernel
-npm install
+cd halofy/kernel
+npm ci
 npm run demo
 ```
 
-Output from a real run on the source tree, excerpted — `...` marks an elision.
-(Honesty note for this pre-release branch: the commands above are verified
-against the full source tree. The reduced public tree produced by the release
-tooling does not yet compile; see `open-source/STATUS.md`. This note is removed
-when the public tree passes `typecheck`, `demo` and `test` in a clean checkout.)
+No API key. No database server. No model download. No network call. The demo
+boots the real kernel on embedded PGlite, then exercises pinning, assembly,
+writes, hybrid search, an L3 context fault, audit, import, fragmentation, and
+signed erasure.
 
 ```text
 == T0 ·· boot in-memory, pin the refund policy, assemble the working set
-booted: embedder=hash(dim=256) llm=stub knowledge=/tmp/halomem-demo-knowledge-6RUybo
-working set for org/support/agent-1: 1 block(s), 28/3000 tokens
-  [pinned-concept] concepts/refund-policy.okf.enc (28 tok): Refund policy Refunds are issued in full ...
+booted: embedder=hash(dim=256) llm=stub
 
-== T1 ·· mem_write - extract facts from a support-chat transcript
-write result: stored=2 rejected=0 superseded=0 deduplicated=0
-  + 01M0JWREMV8M9EN2MZ573XBYR9 [user/fact, conf=0.9] my name is Dana Whitfield and my loyalty tier is Gold [entities: Dana, Whitfield, Gold]
+== T3 ·· mem_fault - page missing context in from L3
+fault: hit=true source=L3 injected=2
 
-...
-
-== T3 ·· mem_fault - allergy escalation is NOT in L2; page it in from L3
-fault: hit=true source=L3 injected=2 latencyMs=36
-  score=0.704 [L3] concepts/escalation-matrix.okf.enc: Support escalation matrix: Allergy incidents page Tier 2 ...
-
-== T5 ·· mem_stats + audit trail
-stats: l2=3 l3Concepts=3 faults=1 faultHitRate=1.00 avgWorkingSetTokens=28 auditEvents=6
-last 7 audit rows (most recent first):
-  2026-08-21T19:28:56.731Z  stats     ok     actor=user:dana l2=3 l3=3 audit=6
-  2026-08-21T19:28:56.642Z  fault     ok     actor=user:dana source=L3 injected=2 tokens=60 latencyMs=36 driver=baseline
-  2026-08-21T19:28:56.589Z  search    ok     actor=user:dana returned=2 tokens=60 driver=baseline
-  ...
-
-...
-
-== T7 ·· mem.forget - erase the customer and mint a signed deletion certificate
-before forget: mem_search surfaces 4 Dana Whitfield fact(s) (conversation + imported CRM)
-forget (as org/support): erased 4 row(s), wrote 4 tombstone(s)
-certificate 01M0JWRF3ZMGA0RCGA9DARWERZ verifyCertificate === true
-  algorithm=ed25519 publicKey=MCowBQYDK2VwAyEA… signature=CQ039g8Ml2aNtvgQ…
-after forget: mem_search surfaces 0 Dana Whitfield fact(s) (expect 0)
-  getById(01M0JWREMV8M9EN2MZ573XBYR9) found=false (expect false - the row is hard-deleted)
-audit trail intact: 1 'forget' row(s) recorded (the erased content's history is never deleted - D4)
-
-...
+== T7 ·· mem.forget - erase the customer and mint a signed certificate
+certificate 01... verifyCertificate === true
+after forget: mem_search surfaces 0 matching facts
 
 demo complete - kernel closed.
 ```
 
-Exit code 0. Then run the hermetic test suite and the driver conformance kit,
-still with no credentials:
+Then prove the kernel and its retrieval boundary:
 
 ```bash
-npm test                                  # hermetic: PGlite + StubLlm + HashEmbedder, zero network
-npx tsx src/cli.ts conformance baseline   # driver boundary + quality kit
+npm test
+npx tsx src/cli.ts conformance baseline
 ```
 
-Real output. The latency number is whatever your machine does, and the
-`read-only` row's absolute source path is elided:
+The current standalone verification passes **2,675 tests across 204 files** and
+all **6/6** driver-conformance checks. Timings and generated identifiers vary by
+machine; the behavior does not.
 
-```text
-conformance report - driver 'baseline' (view: driver/view.js)
-check                 result  detail
---------------------  ------  ----------------------------------------
-finds-planted-fact    PASS    10/10 planted refs in top-3 (need >= 8)
-respects-scoped-view  PASS    0 violations across 15 queries (5 canaries in sibling ns unreachable)
-latency-envelope      PASS    p95 5.5ms over 20 plan() calls (bound 150ms)
-budget-discipline     PASS    max sum(tokenEstimate) 120/120 across 10 queries
-read-only             PASS    no forbidden imports (../{index,kernel,db,write,audit,cold}[/.]*, createRequire, computed dynamic import)
-deterministic-k       PASS    same top-3 across repeated runs of 3 queries
-result: PASS (6/6 checks)
-```
-
-### 2. Self-host with real Postgres
+### Start the API and control room
 
 ```bash
 cd kernel
-npm run env:init          # generates kernel/.env: ed25519 signing key, KEKs, bootstrap token
-docker compose up --build # pgvector/pg16 + the non-root kernel image
+npm run serve
 ```
 
-Open `http://localhost:8787/console/login`, expand **First installation**, and
-paste `HALOMEM_BOOTSTRAP_TOKEN` from `kernel/.env`. The HTTP API and
-`/healthz` live at the same origin. Numbered migrations run before the server
-accepts traffic. Full walkthrough: [docs/self-hosting.md](docs/self-hosting.md).
+Open [`http://localhost:8787/console/login`](http://localhost:8787/console/login).
+For a durable self-hosted deployment with Postgres, generated keys, and Docker
+Compose, follow [the self-hosting guide](docs/self-hosting.md).
 
-### 3. Run it as an MCP server
+### Connect an agent over MCP
 
 ```bash
 cd kernel
-npx tsx src/cli.ts keygen org/support/agent-1 user:dana owner   # plaintext printed once
+npx tsx src/cli.ts keygen org/support/agent-1 user:dana owner
 HALOMEM_API_KEY=hm_... npm run mcp
 ```
 
-Real extraction turns on with `ANTHROPIC_API_KEY`; real embeddings with
-`OPENAI_API_KEY`. Without them the kernel runs deterministic stubs. That is
-the intended default, not a degraded mode.
+The API key resolves the namespace, actor, and role server-side. MCP tool
+schemas do not accept caller-asserted identity fields.
 
----
+## Architecture
 
-## How it works
+<p align="center">
+  <img src=".github/assets/halofy-architecture.svg" alt="Halofy architecture: governed writes, delegated reads, one Postgres authority" width="100%" />
+</p>
 
-```text
-                    agents · applications · CLI · browser
-                                    │
-              MCP stdio      │      HTTP /v1      │      console
-                                    │
-                    ┌───────────────▼───────────────┐
-                    │  identity resolution (D9)     │  API key ─▶ tenant,
-                    │  resolved server-side, from   │  namespace, actor, role.
-                    │  the API key alone            │  Never from the body.
-                    └───────────────┬───────────────┘
-                                    │
-      mem_write ◀───────────────────┴───────────────────▶ mem_search · mem_fault
-          │                                                      · mem_assemble
-          ▼                                                      │
-┌────────────────────────────┐                                   ▼
-│  WRITE PATH — custody      │              ┌──────────────────────────────────┐
-│                            │              │  READ PATH — delegated (D1, D2)  │
-│  extract   LLM or stub     │              │                                  │
-│  verify    drop hallucin.  │              │  allocator packs a working set   │
-│  resolve   entity registry │              │  under a token budget and        │
-│  dedupe    exact + cosine  │              │  returns RANKED BLOCKS — it      │
-│  supersede close the prior │              │  never assembles a prompt        │
-│            fact's validity │              │              │                   │
-│            and link to it; │              │      ScopedView — read-only,     │
-│            never overwrite │              │      ACL-narrowed, valid rows    │
-│            (D7)            │              │              │                   │
-│  provenance + audit        │              │   ┌──────────▼───────────┐       │
-└─────────────┬──────────────┘              │   │  driver cartridge    │       │
-              │                             │   │  import-fenced       │       │
-              │                             │   │  baseline·graph·mem0 │       │
-              │                             │   └──────────┬───────────┘       │
-              │                             └──────────────┼───────────────────┘
-              ▼                                            ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  POSTGRES — one authority (D5). PGlite embeds it for dev and test.           │
-│                                                                              │
-│  L2  memory_objects + pgvector    bi-temporal rows, supersedence chains      │
-│  L3  concepts                     encrypted, Git-versioned markdown          │
-│      policy · api_keys · entity_registry · tombstones                        │
-│      audit_log — append-only ─────────────────────────────────────────────┐  │
-└───────────────────────────────────────────────────────────────────────────┼──┘
-                                                                            │
-                                                                            ▼
-        every syscall, every outcome — ok · denied · miss · brownout · error (D4)
-```
+### The important boundaries
 
-**Identity (D9).** A namespace, actor, role, or source scope is resolved
-server-side from the API key. Any code path that reads a namespace from a
-request body is a bug, and there are regression tests that say so.
+1. **Identity is server-owned.** Namespace, actor, role, and source scope come
+   from the credential—not from a request body.
+2. **Writes have custody.** Corrections close the prior fact's validity interval
+   and link the replacement. They do not overwrite history.
+3. **Reads are delegated.** A retriever sees only an ACL-scoped `ScopedView` and
+   can return references only. It cannot write or reach audit/storage modules.
+4. **Postgres is the authority.** Memory, embeddings, policy, provenance,
+   tombstones, and audit live together. PGlite embeds the same model for local
+   development and tests.
+5. **Every outcome audits.** Success, denial, miss, brownout, and error paths all
+   append an event.
 
-**The ACL rule.** A caller in namespace `N` sees rows whose namespace is `N`
-or a `/`-split prefix *ancestor* of `N`. Org and team knowledge flows down;
-sibling and session data never flows sideways. Descendants are invisible too —
-admin subtree reads are an explicit, audited exception.
+Read [the architecture guide](docs/architecture.md) for the syscall pipeline,
+ACL examples, SQL, tiering, brownout behavior, and a per-directory source map.
+
+## Security model
+
+The core namespace rule is deliberately small: a caller in namespace `N` sees
+rows belonging to `N` or an exact `/`-split ancestor of `N`. Siblings and
+descendants remain invisible unless an explicit, audited administration path
+allows a subtree operation.
 
 ```text
-caller namespace: org/support/agent-1
+caller: org/support/agent-1
 
-  org                          visible     (prefix ancestor)
-  org/support                  visible     (prefix ancestor)
-  org/support/agent-1          visible     (self)
-  org/support/agent-2          not visible (sibling)
-  org/support/agent-1/scratch  not visible (descendant)
-  org/sales                    not visible (sibling)
+org                          visible     ancestor
+org/support                  visible     ancestor
+org/support/agent-1          visible     self
+org/support/agent-2          hidden      sibling
+org/support/agent-1/scratch  hidden      descendant
+org/sales                    hidden      sibling
 ```
 
-Enforcement lives in the repository layer (`kernel/src/index/index.ts`), not
-in callers. The ancestor set is matched as an exact `IN (...)` list, so no
-pattern metacharacter can widen it. The one place a subtree match is
-legitimate — the audited admin scope — is built as `LIKE ... ESCAPE '\'`,
-because `_`, `%`, and backslashes are all legal inside a namespace.
+The query layer enforces this rule with exact ancestor matching. Retrieval
+drivers do not reimplement it; they receive an already-scoped view. See the
+[threat model](docs/security/threat-model.md) for the known partial controls and
+adversarial cases, and the [architecture guide](docs/architecture.md) for the
+worked ACL queries.
 
-**Delegated retrieval.** Drivers under `kernel/src/driver/` may import only
-the types, retrieval, and embedding surfaces. They receive a `ScopedView`
-already narrowed by the ACL and return ranked references. The conformance kit
-runs six checks — planted-fact recall, scoped-view isolation with canaries in
-sibling namespaces, a latency envelope, token-budget discipline, a static
-read-only source scan, and determinism — and a driver that fails any of them
-is not mountable.
+## Open by design
 
-**Brownout, never hard-fail.** If a backend, LLM, or budget cap fails, the
-kernel degrades — verbatim writes, BM25-only search, pinned working set — and
-logs the degradation. It never converts missing security evidence into
-success.
+The standalone build is not a trial:
 
-More: [docs/architecture.md](docs/architecture.md) walks the same path with
-worked examples, the SQL, and a per-directory source map.
+| Property | Standalone behavior |
+|---|---|
+| Licence/activation | No licence key, edition flag, activation, or entitlement check |
+| Packaging quota | None; the public `QuotaPort` defaults to `UNMETERED` |
+| Capacity controls | Operator-owned policy rate limits and model-budget brownout only |
+| Telemetry | None; no usage beacon or Halofy phone-home |
+| Models | Offline deterministic defaults; optional direct Anthropic, OpenAI-compatible, OpenAI embedding, and Azure OpenAI configuration |
+| Database | Embedded PGlite by default; regular Postgres/pgvector for durable deployments |
+| Export | Open schema, export, manifest, and erasure paths |
 
----
+The permanent boundary is documented in
+[OPEN-SOURCE-SCOPE.md](OPEN-SOURCE-SCOPE.md). The practical feature matrix is in
+[open build vs. managed service](docs/commercial/open-vs-managed.md).
 
-## What makes this different
+### Deliberately commercial
 
-Three things, all checkable in the previous section:
+Halofy's managed operations—not memory custody—fund the open kernel:
 
-1. **It runs end to end with nothing installed but Node.** `npm run demo`
-   needs no API key, no database server, no network, and no model
-   download. You can watch the whole custody story — pin, write, search,
-   page in from the cold tier, erase with a signed certificate — before
-   deciding whether to trust it. (Supersedence needs a real extractor to
-   fire on free text; the deterministic stub does not produce the
-   contradiction. `npx vitest run test/write-path.test.ts` exercises it
-   directly, also with no credentials.)
-2. **The governance code is the part that is open.** ACL prefix matching,
-   append-only audit, supersedence chains, provenance, and erasure
-   certificates are all readable source. You cannot credibly sell auditable
-   memory while the audit implementation is a binary.
-3. **Retrieval is a cartridge slot, not a lock-in.** The boundary is enforced
-   by a static scan, not a code-review convention, so swapping the retriever
-   cannot quietly grant it write or audit access.
+- model routing, spend attribution, and gateway observability;
+- billing, credit ledger, and hosted usage plans;
+- operated Slack, Discord, WhatsApp, and Google Chat applications;
+- the managed SaaS connector catalogue and its OAuth applications;
+- federated live query across organizations;
+- the tuned extraction prompt pack; and
+- managed infrastructure, upgrades, backups, uptime, and support commitments.
 
----
-
-## Comparison
-
-The other projects in this space are good, and two of them are considerably
-more established than this one. Values below were checked on 2026-08-21;
-`—` means **we did not verify that cell**, not that the answer is no. Check
-anything you plan to rely on.
-
-| | Halofy | Cognee | Mem0 | Supermemory |
-|---|---|---|---|---|
-| License | AGPL-3.0-or-later, with Apache-2.0 subtrees | Apache-2.0 | Apache-2.0 | MIT (shell) |
-| GitHub stars | new project | 30,170 | 63,755 | 28,983 |
-| Contribution agreement | CLA | DCO | CLA | — |
-| Memory engine source in the repo | yes | yes | yes | **no** — "Local" is a prebuilt binary |
-| Full run with no API key | **yes** | not by default (raises `LLMAPIKeyNotSetError`; Ollama path documented) | not by default (`Memory()` raises without `OPENAI_API_KEY`; local providers via config) | partial (local embeddings, LLM still required for extraction) |
-| Telemetry on by default | no | — | **yes** (PostHog), plus in-SDK upsell flags | — |
-| Documented self-host limits | 60 req/min default rate limit, operator-set; flag-gated trial quotas, off by default — both in `docs/self-hosting.md` | — | — | **undocumented 10,000-document cap** |
-| Graph memory in the OSS repo | yes (`kernel/src/driver/graph.ts`) | — | **removed in v2.0.0** | — |
-
-**What the others do better.** Cognee ships its whole pipeline under
-Apache-2.0 and takes contributions under a DCO rather than a CLA — materially
-less friction than we ask for, and no relicensing question. Mem0 has by far
-the largest community and the most mature multi-language SDK surface; if you
-want something with miles on it and a busy issue tracker, that is Mem0.
-Supermemory is MIT-licensed at the shell and has the most polished hosted
-developer experience of the four.
-
-**Where we are worse.** Halofy is new and has no community. AGPL-3.0 is more
-restrictive than Apache-2.0 or MIT, and we require a CLA. Several subsystems
-are deliberately not in this repository (next section). If any of that is
-disqualifying, one of the projects above is the better choice, and we would
-rather you pick it now than be surprised later.
-
----
-
-## Open source and commercial
-
-The kernel in this repository is the real thing, not a demo shell: the write
-path, tiering, ACL, audit, supersedence, erasure, the console, the driver
-cartridges, and the self-host stack are all here and all run offline.
-
-**Deliberately not in this repository**, because it is what funds the work:
-
-- **Model routing and spend attribution** — the commercial AI gateway.
-- **Billing, credit ledger, and usage caps.**
-- **Managed communication channels** (Slack, Discord, WhatsApp operations).
-- **The managed connector catalog** — the large hosted-integration catalog.
-  The connector *framework* is here, with filesystem, Postgres, CSV, and
-  Obsidian connectors, so you can write your own.
-- **Federated live query** across external systems.
-- **Usage analytics surfaces.**
-- **The tuned extraction prompt pack.** The LLM plumbing ships — the provider
-  clients for Anthropic, Azure OpenAI and any OpenAI-compatible endpoint, the
-  deterministic stub that the demo and the test suite run on, and the
-  loose-JSON parser. The tuned prompt set behind hosted extraction quality is
-  commercial.
-
-There is no license key, no edition flag, no seat or document cap, and no
-phone-home to disable. If you self-host, the kernel never contacts us.
-
-That boundary is written down and versioned as a promise, with a stated
-procedure for what happens if we ever move it:
-[OPEN-SOURCE-SCOPE.md](OPEN-SOURCE-SCOPE.md). Licensing mechanics are in
-[LICENSING.md](LICENSING.md); the feature-by-feature comparison is in
-[docs/commercial/open-vs-managed.md](docs/commercial/open-vs-managed.md).
-Commercial licenses, for organizations that cannot accept AGPL network
-copyleft: <licensing@halofy.ai>.
-
----
+None of those components is required to run this repository. The connector
+framework, baseline model plumbing, memory lifecycle, governance, console,
+self-host stack, and test suite are present and runnable.
 
 ## Documentation
 
-| Path | What |
+| Guide | Use it when you want to… |
 |---|---|
-| [docs/README.md](docs/README.md) | Documentation index |
-| [docs/getting-started.md](docs/getting-started.md) | Zero to a working kernel, with real commands and real output |
-| [docs/architecture.md](docs/architecture.md) | Trace a request; locate the owning module |
-| [docs/driver-kit.md](docs/driver-kit.md) | Write a retrieval cartridge and pass conformance 6/6 |
-| [docs/self-hosting.md](docs/self-hosting.md) | Docker Compose, environment, backup/restore, upgrades |
-| [docs/security/threat-model.md](docs/security/threat-model.md) | Assets, adversaries, controls — including the partial ones |
-| [kernel/README.md](kernel/README.md) | Kernel package: scripts, layout, development commands |
-| [OPEN-SOURCE-SCOPE.md](OPEN-SOURCE-SCOPE.md) | What stays open, permanently, and what is commercial |
+| [Getting started](docs/getting-started.md) | Go from clone to first key, write, search, MCP connection, and real model configuration |
+| [Architecture](docs/architecture.md) | Trace requests, understand custody, or change the kernel |
+| [Driver kit](docs/driver-kit.md) | Build and validate a retrieval cartridge |
+| [Self-hosting](docs/self-hosting.md) | Run Postgres, Docker Compose, backups, restores, and upgrades |
+| [Threat model](docs/security/threat-model.md) | Review assets, boundaries, adversaries, and known partial controls |
+| [Open-source scope](OPEN-SOURCE-SCOPE.md) | See what stays open and how that promise changes |
+| [Kernel reference](kernel/README.md) | Find scripts, source directories, environment variables, and development commands |
 
----
+The full index is in [docs/README.md](docs/README.md).
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) first. The short version: open an
-issue before building anything large; changes to auth, ACL, tenancy,
-migrations, encryption, audit, or the write/retrieval boundary get adversarial
-review; every bug fix ships with the regression test that would have caught
-it; and paste real command output in the pull request rather than describing
-it.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). Security-sensitive changes to
+authentication, tenancy, ACLs, migrations, encryption, audit, erasure, or the
+write/retrieval boundary require adversarial review and regression coverage.
 
-Contributions require a CLA ([CLA.md](CLA.md)), which is what makes the
-commercial license offerable alongside the AGPL one. Community expectations
-are in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+Security reports belong in the private channels described by
+[SECURITY.md](SECURITY.md), not in public issues. Community expectations are in
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
-Security issues do **not** go in the issue tracker — see
-[SECURITY.md](SECURITY.md). The highest-value targets are ACL prefix
-matching, `LIKE`/`ESCAPE` namespace escapes, audit omission, erasure
-certificate forgery, and token handling.
+## License
 
----
+The kernel and console are **AGPL-3.0-or-later**. Named client and extension
+subtrees—including `kernel/src/driver/`, `kernel/src/mcp/`, and
+`kernel/integrations/`—are **Apache-2.0** so they can be embedded without
+relicensing the host application. See [LICENSING.md](LICENSING.md) and
+[NOTICE](NOTICE) for the authoritative file-by-file boundary.
 
-## License and trademarks
-
-Halofy is distributed under **AGPL-3.0-or-later** ([LICENSE](LICENSE)).
-
-Named subtrees are **Apache-2.0** ([LICENSE-APACHE-2.0](LICENSE-APACHE-2.0))
-so they can be embedded in closed applications the way a client library
-should be — `kernel/src/driver/`, `kernel/src/mcp/`, and
-`kernel/integrations/`. Writing a retrieval cartridge or an MCP
-client should not relicense your application. The authoritative scope is in
-[LICENSING.md](LICENSING.md) and [NOTICE](NOTICE); each such directory also
-carries its own `LICENSE` file.
-
-"Halofy" and "Halofy", and the Halofy logo, are trademarks. **Neither license
-grants trademark rights** — see [TRADEMARK.md](TRADEMARK.md). Forks must
-rename.
+The Halofy name is a trademark; neither software licence grants trademark
+rights. See [TRADEMARK.md](TRADEMARK.md).

@@ -12,7 +12,6 @@ This policy covers the **Halofy Marks**:
 | Mark | Type |
 |---|---|
 | **Halofy** | word mark |
-| **Halofy** | word mark |
 | The Halofy logo, in any colourway (`kernel/console/assets/marks/`) | design mark |
 | Any confusingly similar word or design, including transliterations, misspellings, and translations | — |
 
@@ -69,9 +68,9 @@ You may fork. That is the point of AGPL.
 **If you distribute a modified version, you must not present it as Halofy.**
 Concretely:
 
-- Give it its own name. Do not use "Halofy" or "Halofy" as the first or
-  dominant word: `Halofy Enterprise`, `Halofy Pro`, `Halofy Cloud` and
-  `HaloMemDB` are not available to you.
+- Give it its own name. Do not use "Halofy" or a confusingly similar variation
+  as the first or dominant word: `Halofy Enterprise`, `Halofy Pro`, and
+  `Halofy Cloud` are not available to you.
 - Do not use the Halofy logo as your product's logo, icon, favicon, or app-store
   artwork. Replace the files in `kernel/console/assets/marks/`. The console
   degrades to a text wordmark when they are absent
@@ -80,7 +79,7 @@ Concretely:
   encouraged:
   - *"Acme Recall — a fork of Halofy"*
   - *"Acme Recall is derived from the Halofy organizational memory kernel"*
-  - *"Based on Halofy by Halofy"*
+  - *"Based on the Halofy project by Halofy"*
 - Do not describe your fork as "official", "certified", "supported by Halofy",
   "endorsed", or "the enterprise edition of Halofy".
 - Route your own bugs. Do not point users at Halofy support channels for a build

@@ -12,13 +12,12 @@ import { describe, expect, it } from "vitest";
 const CONSOLE_DIR = fileURLToPath(new URL("../console/", import.meta.url));
 
 async function consoleSource() {
-  const [html, css, app, preview] = await Promise.all([
+  const [html, css, app] = await Promise.all([
     readFile(`${CONSOLE_DIR}/index.html`, "utf8"),
     readFile(`${CONSOLE_DIR}/app.css`, "utf8"),
     readFile(`${CONSOLE_DIR}/app.js`, "utf8"),
-    readFile(`${CONSOLE_DIR}/_codex-home-preview.html`, "utf8"),
   ]);
-  return { html, css, app, preview };
+  return { html, css, app };
 }
 
 describe("Halofy brand routes home", () => {
@@ -39,14 +38,11 @@ describe("Halofy brand routes home", () => {
     expect(railBrand).toContain('id="rail-collapse"');
   });
 
-  it("uses the white rail orb on the dark shell and local preview", async () => {
-    const { html, preview } = await consoleSource();
+  it("uses the white rail orb on the dark shell", async () => {
+    const { html } = await consoleSource();
 
     expect(html).toMatch(
-      /<img class="mark" src="assets\/marks\/halofy-mark-white\.png"/,
-    );
-    expect(preview).toMatch(
-      /<img class="mark" src="assets\/marks\/halofy-mark-white\.png"/,
+      /<img class="mark" src="assets\/marks\/halofy-mark-white\.svg"/,
     );
   });
 

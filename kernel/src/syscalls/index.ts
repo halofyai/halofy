@@ -74,7 +74,6 @@ import { BASELINE_DRIVER_NAME, isDriverUnavailableError } from "../driver/index.
 import { pickDriverName, type RoutingPolicy } from "../routing/index.js";
 import { AuthzError } from "../auth/index.js";
 import { DEFAULT_RATE_LIMIT_PER_MIN, type BudgetGuard, type PolicyConfigX } from "../policy/index.js";
-import { earlyAccessRateLimitPerMin } from "../billing/early-access.js";
 import {
   effectiveBudgetUsd,
   effectiveRateLimit,
@@ -145,6 +144,8 @@ export interface SyscallDeps {
   };
   budget: BudgetGuard;
   logger: Logger;
+  /** Optional commercial quota clamp. Standalone builds leave this absent. */
+  quotaRateLimit?(current: number, actor?: string): number;
   /**
    * Durable credential-state check. Identity objects may outlive the request
    * that resolved them (notably stdio MCP), so no syscall may trust the
@@ -814,10 +815,8 @@ export async function gate(
   // Start from the existing per-namespace effective limit (policy override or
   // the default), then let a tenant cap only LOWER it (never raise it).
   const namespaceLimit = policy.rateLimitPerMin ?? DEFAULT_RATE_LIMIT_PER_MIN;
-  const limit = earlyAccessRateLimitPerMin(
-    effectiveRateLimit(namespaceLimit, tenant) ?? namespaceLimit,
-    identity.actor,
-  );
+  const policyLimit = effectiveRateLimit(namespaceLimit, tenant) ?? namespaceLimit;
+  const limit = deps.quotaRateLimit?.(policyLimit, identity.actor) ?? policyLimit;
   const denial = `rate limit exceeded (${limit} requests/min for this key)`;
   // Prefer the durable outcome so the 429 can carry a retry-after; the bucket
   // key MUST match DurableRateLimitStore.allow()'s so the syscall lane does

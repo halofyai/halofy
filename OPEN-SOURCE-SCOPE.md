@@ -190,14 +190,12 @@ The self-hosted build is complete and unmetered:
   build.
 - **No caps imposed by us.** No seat limit, no namespace limit, no document
   limit, no memory count limit, no retention ceiling. Your limits are your
-  Postgres and your hardware. Two things that look like caps are not: a
-  per-key rate limit defaults to 60 requests/minute and is operator-set per
-  policy (`kernel/src/policy/store.ts`); and the kernel contains a
-  flag-gated early-access quota system used by the hosted service
-  (`HALOMEM_EARLY_ACCESS`, default off) that a self-hoster never needs to
-  enable. Both are documented in `docs/self-hosting.md`. We are committed to
-  removing the early-access gate from the open build entirely; until that
-  lands, this sentence describes what ships, not what we wish shipped.
+  Postgres and your hardware. The standalone `QuotaPort` defaults to
+  `UNMETERED`; the hosted billing and trial-quota implementations are not in
+  this repository. A per-key rate limit defaults to 60 requests/minute and an
+  optional model-budget brownout can be set per namespace. Both are
+  operator-owned policy controls, not packaging quotas, and both are
+  documented in `docs/self-hosting.md`.
 - **No phone-home.** No telemetry, no usage beacon, no anonymous statistics, no
   in-product upsell fetched from a remote flag service. The build does not talk
   to Halofy, ever, and you can grep for that.
@@ -320,10 +318,11 @@ them accurate. Open-sourcing it would not make your memory kernel more
 trustworthy; it would just hand a competitor a price book.
 
 **Billing, credit ledgers and usage caps.** These exist to bill Halofy's
-customers. They are useless to a self-hoster. Today the open build still
-carries a flag-gated early-access quota module that is off by default and
-never requires a licence key; extracting it behind a no-op port so the open
-build has no quota code at all is tracked work, not a done deed.
+customers. They are useless to a self-hoster, so their implementations are not
+in the open build. The kernel depends only on the public `QuotaPort`, whose
+standalone implementation is `UNMETERED`. Operator-configured rate limits and
+model-budget brownout remain open governance controls; they are not billing or
+plan enforcement.
 
 **Managed channels (Slack, Discord, WhatsApp, Google Chat).** These are
 platform-app operations: a single verified app per platform, app-review

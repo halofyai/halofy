@@ -16,10 +16,6 @@
 import type { Db } from "../../db/client.js";
 import { namespaceAncestors, TTL_ACTIVE_CLAUSE } from "../../index/index.js";
 import { isRootOwner } from "../../auth/index.js";
-import {
-  connectorCatalogEntry,
-  isPlatformConnectorId,
-} from "../../ingest/connectors/catalog/index.js";
 import type { Identity, Namespace } from "../../types.js";
 
 /**
@@ -129,9 +125,9 @@ function toIso(value: unknown): string {
   return new Date(0).toISOString();
 }
 
-/** Ingest driver for a connector kind — catalog first, then the built-ins. */
+/** The standalone build ships only built-in connector drivers. */
 export function sourceDriver(kind: string): SourceDriver {
-  if (isPlatformConnectorId(kind)) return connectorCatalogEntry(kind).runtime.adapter;
+  void kind;
   return "builtin";
 }
 

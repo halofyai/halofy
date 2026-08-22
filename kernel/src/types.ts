@@ -2511,6 +2511,22 @@ export interface LiveResult {
   sources: { connectorId: string; outcome: "hit" | "miss" | "denied" | "error" }[];
 }
 
+/** Content-free source projection used by assistant-safe local search. */
+export interface CopilotSourceSummary {
+  id: string;
+  kind: string;
+  label: string;
+  syncStatus: "never_synced" | "pending" | "synced" | "failed";
+  lifecycleState: "active" | "paused" | "disabled";
+  lastSync: string | null;
+  liveSearchSupported?: boolean;
+}
+
+export interface CopilotSourceSearchResult {
+  sources: CopilotSourceSummary[];
+  hits: ScoredRef[];
+}
+
 // ---------------------------------------------------------------------------
 // M9-parity — builder-local shared types promoted as type-only re-exports.
 // Type-only (`export type ... from`) so nothing here adds a runtime import
@@ -2522,11 +2538,9 @@ export interface LiveResult {
 /** #4 (E41): how a source's records reach the write path / failure buckets. */
 export type { SourceDriver, SourceFailureClass } from "./console/rollups/sync-overview.js";
 /** #15 (E49): server-derived internal/external caller classification. */
-export type { CallerClass } from "./console/rollups/user-analytics.js";
 /** #23 (E52): product key-type labels over the existing ROLES. */
 export type { ProductKeyType, TypedKeyRecord } from "./auth/key-types.js";
 /** #1 (E2): GitHub App installation summaries (no token/config fields exist). */
-export type { GitHubInstallationStatus, GitHubInstallationSummary } from "./ingest/github-app.js";
 
 // ---------------------------------------------------------------------------
 // M10 ACCESS (CONTRACTS-M10-ACCESS.md) — role-scoped memory graph. One

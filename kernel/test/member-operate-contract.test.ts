@@ -43,14 +43,12 @@ describe("member console information architecture", () => {
       "s5",
       "s6",
       "s14",
-      "s10",
       "s16",
-      "s15",
       "s18",
     ]);
   });
 
-  it("places Usage analytics under Operate so a member renders no Govern group", () => {
+  it("does not advertise commercial analytics to members", () => {
     const navStart = appSource.indexOf("const NAV = [");
     const navEnd = appSource.indexOf("/** The flat set", navStart);
     const navSource = appSource.slice(navStart, navEnd);
@@ -60,12 +58,10 @@ describe("member console information architecture", () => {
     const operate = navSource.slice(operateStart, governStart);
     const govern = navSource.slice(governStart, onboardStart);
 
-    expect(operate).toContain('{ s: "s15", icon: "score", label: "Usage analytics", memberOperate: true }');
-    expect(govern).toContain('{ s: "s15", icon: "score", label: "Usage analytics", governance: true }');
-    expect(appSource).toContain('if (item.memberOperate === true && !operatingMember) return false;');
-    expect(appSource).toContain('if (item.governance === true && operatingMember) return false;');
+    expect(operate).not.toContain('label: "Usage analytics"');
+    expect(govern).not.toContain('label: "Usage analytics"');
 
-    const governedIds = ["s13", "s3", "s19", "s4", "s7", "s11", "s8", "s20", "s17", "s12"];
+    const governedIds = ["s13", "s3", "s19", "s4", "s7", "s11", "s8", "s20", "s17"];
     const memberLine = /member:\s*(\[[^\]]+\])/.exec(appSource);
     const memberScreens = JSON.parse(memberLine![1]!) as string[];
     expect(memberScreens.filter((id) => governedIds.includes(id))).toEqual([]);

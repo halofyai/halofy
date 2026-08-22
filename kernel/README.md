@@ -10,9 +10,9 @@ map, read [`../docs/architecture.md`](../docs/architecture.md).
 ## Quickstart
 
 ```bash
-npm install
+npm ci
 npm run demo    # the full story: pin → assemble → write → search → L3 fault →
-                # supersede → stats/audit → erase with a signed certificate.
+                # update → stats/audit → erase with a signed certificate.
                 # No API key, no database server, no network, no model download.
 npm test        # hermetic suite: in-memory PGlite + pgvector, StubLlm,
                 # HashEmbedder, zero network

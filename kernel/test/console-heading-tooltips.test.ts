@@ -36,12 +36,9 @@ describe("console heading subtext tooltips", () => {
       // describes the three-step flow (find → organize → draft for review).
       ["screens/s7.js", "Processes new saved memories", 1],
       ["screens/s8.js", "Every read, write, deletion", 1],
-      ["screens/s12.js", "new or saved provider connection", 2],
       ["screens/s14.js", "Agents and MCP clients you connected", 2],
-      ["screens/s15.js", "Every traced query in scope", 1],
       ["screens/s16.js", "Every skill your teams have added", 1],
       ["screens/s17.js", "Most apps add themselves", 2],
-      ["screens/s21.js", "Put Halo Assistant where your customers already talk", 4],
     ] as const;
 
     for (const [path, phrase, minimumInfoCalls] of expectations) {
@@ -52,19 +49,13 @@ describe("console heading subtext tooltips", () => {
   });
 
   it("keeps operational errors, live states, field help, and irreversible-action warnings visible", async () => {
-    const [audit, channels, models] = await Promise.all([
-      source("screens/s8.js"),
-      source("screens/s21.js"),
-      source("screens/s12.js"),
-    ]);
+    const audit = await source("screens/s8.js");
 
     // The erase card's long description moved into the title tooltip (design
     // decision, 2026-08-07); the VISIBLE irreversible-action warning is the
     // crit pill, which must never migrate into a tooltip.
     expect(audit).toContain('<i class="dot"></i>Cannot be undone');
     expect(audit).toContain("Right to be forgotten. Permanently removes the matching memory");
-    expect(channels).toContain('<div class="hint" data-s21-status role="status"');
-    expect(models).toContain('role="alert"><h3>Could not load model runtime</h3>');
   });
 
   // Regression: the S15 instrument panel clipped itself to its own 14px radius

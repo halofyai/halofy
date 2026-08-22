@@ -20,7 +20,7 @@ import type {
   ScoredRef,
   SyscallContext,
 } from "../types.js";
-import { anchorCopilotToolQuery } from "../model-runtime/contextual-query.js";
+import { anchorCopilotToolQuery } from "./contextual-query.js";
 import type { Kernel } from "../kernel.js";
 import type { ManifestResult } from "../discovery/manifest.js";
 import type {

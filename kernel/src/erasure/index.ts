@@ -33,7 +33,7 @@ import type { Db } from "../db/client.js";
 import { namespaceAncestors } from "../index/index.js";
 import { normalizePiiSubject, normalizePiiSubjects } from "../pii.js";
 import { acquireErasureFence } from "../erasure-fence.js";
-import { assistantActorHash } from "../model-runtime/lifecycle.js";
+import { assistantActorHash } from "./actor-hash.js";
 import type {
   AuditEvent,
   AssistantPurgeResult,

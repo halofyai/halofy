@@ -1,0 +1,4 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Halofy">
+  <rect x="3" y="3" width="58" height="58" rx="17" fill="#173B2C"/>
+  <path d="M19 17V47M45 17V47M20 32H44" stroke="#F4FFF8" stroke-width="7" stroke-linecap="round"/>
+</svg>

@@ -70,13 +70,10 @@ describe("operate console minimalism source contracts", () => {
     expect(source).toContain('<p class="sr-only" data-summary-description>');
   });
 
-  it("discloses scorecard methodology and assistant runtime evidence", async () => {
+  it("discloses scorecard methodology", async () => {
     const scorecard = await screenSource("s9");
-    const assistant = await screenSource("s10");
 
     expect(scorecard).toContain('class="compact-disclosure scorecard-method"');
-    expect(assistant).toContain('class="compact-disclosure copilot-panel"');
-    expect(assistant).toContain('class="compact-disclosure__body copilot-panel-body"');
   });
 
   it("keeps connection setup secondary to the client action grid", async () => {

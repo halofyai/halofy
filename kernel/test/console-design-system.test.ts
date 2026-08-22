@@ -7,14 +7,12 @@ const appPath = fileURLToPath(new URL("../console/app.js", import.meta.url));
 const indexPath = fileURLToPath(new URL("../console/index.html", import.meta.url));
 const loginPath = fileURLToPath(new URL("../console/login.html", import.meta.url));
 const memoryScreenPath = fileURLToPath(new URL("../console/screens/s5.js", import.meta.url));
-const assistantScreenPath = fileURLToPath(new URL("../console/screens/s10.js", import.meta.url));
 const conflictsScreenPath = fileURLToPath(new URL("../console/screens/s11.js", import.meta.url));
 const shellPath = fileURLToPath(new URL("../console/index.html", import.meta.url));
 const sourcesScreenPath = fileURLToPath(new URL("../console/screens/s6.js", import.meta.url));
 const skillsScreenPath = fileURLToPath(new URL("../console/screens/s16.js", import.meta.url));
-const usageScreenPath = fileURLToPath(new URL("../console/screens/s15.js", import.meta.url));
 const metricCardPath = fileURLToPath(new URL("../console/metric-card.js", import.meta.url));
-const flowScreenPaths = ["s2", "s4", "s6", "s10", "s14", "s16"].map((screen) =>
+const flowScreenPaths = ["s2", "s4", "s6", "s14", "s16"].map((screen) =>
   fileURLToPath(new URL(`../console/screens/${screen}.js`, import.meta.url)),
 );
 
@@ -168,7 +166,7 @@ describe("console shared visual system", () => {
     const [css, ...screens] = await Promise.all([
       readFile(cssPath, "utf8"),
       ...[
-        "s1", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s16",
+        "s1", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s11", "s13", "s16",
         "policy-library",
       ].map((screen) =>
         readFile(fileURLToPath(new URL(`../console/screens/${screen}.js`, import.meta.url)), "utf8"),
@@ -371,17 +369,15 @@ describe("console shared visual system", () => {
   });
 
   it("keeps dense platform labels at the 12px readability floor", async () => {
-    const [css, memoryScreen, assistantScreen] = await Promise.all([
+    const [css, memoryScreen] = await Promise.all([
       readFile(cssPath, "utf8"),
       readFile(memoryScreenPath, "utf8"),
-      readFile(assistantScreenPath, "utf8"),
     ]);
 
     expect(css).toMatch(/\.memory-topology-stage header>span,[\s\S]*?\.memory-topology-bar,[\s\S]*?font-size:var\(--text-label\)/);
     expect(css).toMatch(/\.m8a-assurance span,[\s\S]*?\.m8a-state,[\s\S]*?\.policy-flow\{font-size:var\(--text-label\)/);
     expect(css).toMatch(/\.source-sync-card tbody td::before,[\s\S]*?\.policy-state,\.policy-table td::before,\.source-technical-details code,[\s\S]*?font-size:var\(--text-label\)/);
     expect(memoryScreen).not.toContain('style="font-size:11px"');
-    expect(assistantScreen).not.toContain('style="font-size:11px"');
   });
 
   it("uses plain outcome-led labels without changing screen ids", async () => {
@@ -389,21 +385,18 @@ describe("console shared visual system", () => {
 
     expect(app).toContain('{ s: "s5", icon: "map", label: "Memory" }');
     expect(app).toContain('{ s: "s6", icon: "src", label: "Sources" }');
-    expect(app).toContain('{ s: "s10", icon: "bot", label: "Assistant" }');
     expect(app).toContain('{ s: "s9", icon: "score", label: "Retrieval quality" }');
     expect(app).toContain('{ s: "s13", icon: "teams", label: "Teams" }');
     expect(app).toContain('{ s: "s3", icon: "bot", label: "Scoped memory" }');
     expect(app).toContain('{ s: "s8", icon: "shield", label: "Audit" }');
-    expect(app).toContain('{ s: "s12", icon: "model", label: "AI models" }');
   });
 
   it("uses one balanced Halo compact-control treatment across the platform", async () => {
-    const [css, shell, login, sources, assistant, skills] = await Promise.all([
+    const [css, shell, login, sources, skills] = await Promise.all([
       readFile(cssPath, "utf8"),
       readFile(shellPath, "utf8"),
       readFile(loginPath, "utf8"),
       readFile(sourcesScreenPath, "utf8"),
-      readFile(assistantScreenPath, "utf8"),
       readFile(skillsScreenPath, "utf8"),
     ]);
 
@@ -440,8 +433,6 @@ describe("console shared visual system", () => {
     expect(login).toContain('href="app.css?v=20260821-1"');
     expect(login).toContain('id="organization-signup"');
     expect(sources).toContain('class="source-wizard-close halo-icon-control"');
-    expect(assistant).toContain('class="btn btn--outline copilot-toolbar-button" data-action="new-chat"');
-    expect(assistant).toContain('class="copilot-send halo-icon-control halo-icon-control--solid"');
     expect(skills).toContain('class="skill-expand halo-icon-control"');
   });
 
@@ -533,40 +524,6 @@ describe("console shared visual system", () => {
     expect(css).not.toContain('body[data-console-screen="s2"] #screen-content');
   });
 
-  it("styles every class the S15 stat bands actually emit", async () => {
-    const [css, usage] = await Promise.all([
-      readFile(cssPath, "utf8"),
-      readFile(usageScreenPath, "utf8"),
-    ]);
-
-    // These rules were once dropped from app.css while s15.js kept emitting the
-    // classes, which left the three band heads on the UA's default h3: oversized
-    // and with the ⓘ riding above the text. A class the screen paints and the
-    // stylesheet never mentions is the failure mode, so assert the pairing.
-    for (const cls of ["usage-stat-section", "usage-stat-section-head"]) {
-      expect(usage, `${cls} no longer emitted`).toContain(`class="${cls}`);
-      expect(css, `${cls} unstyled`).toContain(`.${cls}{`);
-    }
-
-    // Centred, not baseline-aligned: .heading-info is an inline-grid whose
-    // baseline comes from the svg's bottom edge, so a baseline row always
-    // leaves the icon sitting high next to its heading.
-    expect(css).toMatch(/\.usage-stat-section-head\{[^}]*align-items:center/);
-    expect(css).toMatch(/\.usage-stat-section-head h3\{[^}]*display:flex[^}]*align-items:center/);
-    expect(css).toMatch(/\.usage-stat-section-head h3\{[^}]*font-size:11\.25px/);
-
-    // The grouping tabs sit against the right edge of their row.
-    expect(css).toMatch(/\.usage-groups-tabs\{[^}]*justify-content:flex-end/);
-
-    // Card captions wrap to a second line rather than clipping their tail.
-    expect(css).toMatch(/\.metric-card-cap\{[^}]*-webkit-line-clamp:2/);
-    expect(css).not.toMatch(/\.metric-card-cap\{[^}]*white-space:nowrap/);
-
-    // The ledger filter menu sizes to its longest option instead of wrapping it.
-    expect(css).toMatch(/\.usage-filter-pop\{[^}]*width:max-content/);
-    expect(css).toContain(".usage-filter-option-label{");
-  });
-
   it("keeps Usage Analytics on the shared page-header geometry", async () => {
     const css = await readFile(cssPath, "utf8");
 
@@ -584,10 +541,7 @@ describe("console shared visual system", () => {
   });
 
   it("lets a grid opt out of the shared toolbar and findbar", async () => {
-    const [app, usage] = await Promise.all([
-      readFile(appPath, "utf8"),
-      readFile(usageScreenPath, "utf8"),
-    ]);
+    const app = await readFile(appPath, "utf8");
 
     expect(app).toContain("table({ cols, rows, chrome = true } = {})");
     expect(app).toContain('data-grid-chrome="off"');
@@ -599,7 +553,5 @@ describe("console shared visual system", () => {
     expect(classIndex).toBeGreaterThan(-1);
     expect(optOutIndex).toBeGreaterThan(classIndex);
 
-    // S15's group rollup is the one screen that takes the opt-out today.
-    expect(usage).toContain("chrome: false");
   });
 });
