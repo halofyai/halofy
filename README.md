@@ -118,10 +118,6 @@ schemas do not accept caller-asserted identity fields.
 
 ## Architecture
 
-<p align="center">
-  <img src=".github/assets/halofy-architecture.svg" alt="Halofy architecture: governed writes, delegated reads, one Postgres authority" width="100%" />
-</p>
-
 ### The important boundaries
 
 1. **Identity is server-owned.** Namespace, actor, role, and source scope come
