@@ -3,8 +3,9 @@
 Halofy is the open access and governance layer for AI agents across an
 organization. It gives agents, applications, and operators one server-owned
 identity and policy model across shared organizational context, with
-provenance, audit, and signed erasure. The kernel maintains that context and
-delegates ranking to retrieval engines mounted as read-only drivers.
+provenance, audit, and signed erasure. Halofy provides scoped access to memory
+— including the write path, placement across tiers, movement, and governance —
+and delegates retrieval to swappable engines across the organization.
 
 ## Start here
 

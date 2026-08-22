@@ -6,8 +6,9 @@ assumes you have run the demo in [getting-started.md](getting-started.md).
 The shortest possible summary: Halofy is the **access and governance layer**
 for AI agents across an organization. It resolves who an agent is, decides what
 context it may use, governs how that context changes, and records the outcome.
-Ranking is delegated to retrieval engines mounted as read-only drivers.
-Everything else follows from that split.
+Halofy provides scoped access to memory — including the write path, placement
+across tiers, movement, and governance — and delegates retrieval to swappable
+engines across the organization. Everything else follows from that split.
 
 ## Contents
 
