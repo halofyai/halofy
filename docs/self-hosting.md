@@ -145,18 +145,20 @@ keep them stable.
 
 ### Limits
 
-Two things in the kernel look like caps. Neither is a licence gate, and neither
-requires anything from Halofy.
+The standalone composition is unmetered: its optional packaging-quota port is
+`UNMETERED`, and no hosted billing or trial-quota module ships in this
+repository.
 
-| Variable | Default | Meaning |
+Two operator-owned controls still protect a deployment. They govern capacity
+and model use; they do not unlock an edition or contact Halofy.
+
+| Control | Default | Meaning |
 | --- | --- | --- |
 | *(per-namespace policy)* `rateLimitPerMin` | `60` | Requests per minute per API key, enforced by the policy store (`kernel/src/policy/store.ts`, `DEFAULT_RATE_LIMIT_PER_MIN`). Set it per namespace through the policy API; there is no global override variable. |
-| `HALOMEM_EARLY_ACCESS` | *(unset)* | Enables the hosted service's trial-quota module (`kernel/src/billing/early-access.ts`). Leave it unset. When unset the module is inert and no quota, seat or spend check runs. A self-hoster has no reason to set it. |
+| *(per-namespace policy)* `monthlyBudgetUsd` | unset | Optional model-spend brownout threshold. When reached, writes store verbatim rather than calling the configured LLM. It is an operator policy, not Halofy metering. |
 
-There is no seat limit, namespace limit, document limit, memory-count limit or
-retention ceiling in the open build. The early-access module is scheduled to be
-extracted from the open build entirely; until then, this table is the honest
-description of what ships.
+There is no seat limit, namespace limit, document limit, memory-count limit,
+retention ceiling, licence key, or remote entitlement check in the open build.
 
 ### Models and embeddings
 

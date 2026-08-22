@@ -51,7 +51,6 @@ import {
   httpRouteTemplate,
   type HttpTelemetry,
 } from "../observability/http.js";
-import type { HaloAgentsHandoff } from "../console/halo-agents-handoff.js";
 import {
   OAUTH_STATE_COOKIE,
   safeConsentReturn,
@@ -68,6 +67,13 @@ import {
 } from "./console.js";
 // Browser-facing failures render in the Halofy design language (pure renderer).
 import { renderHaloStatusPage } from "../branding/halo-page.js";
+
+/** Optional cross-product browser handoff supplied by a commercial host. */
+export interface HaloAgentsHandoff {
+  readonly issuer: string;
+  readonly destination: string;
+  createAssertion(identity: Identity): string;
+}
 // M6 (D13): header-token merge for POST /v1/mem/fault. adapter.ts imports only
 // TYPES from this file, so this value import introduces no runtime cycle.
 import { withSourceTokens } from "./adapter.js";
@@ -1379,7 +1385,7 @@ const BRAND_ICON_PATHS: ReadonlySet<string> = new Set([
   "/apple-touch-icon-precomposed.png",
 ]);
 /** The mark served for every BRAND_ICON_PATHS entry (a real PNG, always). */
-const BRAND_ICON_FILE = "/console/assets/marks/halofy-mark-green.png";
+const BRAND_ICON_FILE = "/console/assets/marks/halofy-mark-green.svg";
 
 class HttpError extends Error {
   constructor(
@@ -7355,11 +7361,11 @@ export async function handleHttpRequest(
     if (name === "CreditExhaustedError") {
       return json(res, 402, { error: message, code: "credits_exhausted" });
     }
-    if (name === "EarlyAccessLimitError") {
+    if (name === "QuotaLimitError" || name === "EarlyAccessLimitError") {
       const limit = err as Error & { code?: string; feature?: string | null; limit?: number | null };
       return json(res, 402, {
         error: message,
-        code: limit.code ?? "early_access_limit",
+        code: limit.code ?? (name === "QuotaLimitError" ? "quota_limit" : "early_access_limit"),
         feature: limit.feature ?? null,
         limit: limit.limit ?? null,
       });

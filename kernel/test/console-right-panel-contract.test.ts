@@ -31,8 +31,6 @@ describe("console right-panel interaction contract", () => {
     ["screens/s2.js", "home-cap-panel"],
     ["screens/s3.js", "badge-detail-panel"],
     ["screens/s5.js", "viewas-panel"],
-    ["screens/s12.js", "model-setup-panel"],
-    ["screens/s15.js", "usage-trace-panel"],
     ["screens/s16.js", "skill-register-panel"],
     ["screens/s17.js", "oauth-client-panel"],
   ])("routes %s management details through the right panel", async (path, id) => {
@@ -41,13 +39,6 @@ describe("console right-panel interaction contract", () => {
     expect(screen).toContain(`id: "${id}"`);
     expect(screen).toContain(`aria-controls="${id}"`);
     expect(screen).toContain('aria-haspopup="dialog"');
-  });
-
-  it("does not insert Usage details as a new row below the ledger", async () => {
-    const usage = await source("screens/s15.js");
-
-    expect(usage).not.toContain('insertAdjacentHTML("afterend", traceDetailPanel(html))');
-    expect(usage).not.toContain('class="usage-qdetail"');
   });
 
   it("does not render View as as a page card", async () => {

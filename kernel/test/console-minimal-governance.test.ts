@@ -87,31 +87,6 @@ describe("governance console minimalism source contracts", () => {
     expect(source.replace(editor, "")).not.toContain('data-action="dispute-edit"');
   });
 
-  it("puts one model deployment flow after authoritative runtime tables", async () => {
-    const source = await screenSource("s12");
-
-    expect(source.indexOf("renderConnections(ctx, connections)")).toBeLessThan(
-      source.indexOf("renderModelSetup(ctx, connections, profiles)"),
-    );
-    expect(source).toContain('data-action="model-connection-create"');
-    expect(source).toContain('data-change-action="model-deployment-connection-select"');
-    expect(source).not.toContain('data-action="model-profile-create"');
-  });
-
-  it("retires the accuracy hero and observations strip and trims readiness copy", async () => {
-    const [analytics, readiness] = await Promise.all([
-      screenSource("s15"),
-      screenSource("readiness-card"),
-    ]);
-
-    // The methodology disclosure went out with the hero it explained.
-    expect(analytics).not.toContain('class="compact-disclosure analytics-method"');
-    expect(analytics).not.toContain("How often was the agent right?");
-    expect(analytics).not.toContain('title: "Observations"');
-    expect(analytics).not.toContain('data-action="obs-filter"');
-    expect(readiness).not.toContain("Freshness, coverage and trust at a glance.");
-  });
-
   it("keeps skill safety guidance static and discloses registration policy", async () => {
     const source = await screenSource("s16");
 

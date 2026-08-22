@@ -13,22 +13,6 @@
  */
 
 import { z } from "zod";
-import {
-  PLATFORM_CONNECTOR_CATALOG,
-  isPlatformConnectorId,
-} from "../ingest/connectors/catalog/index.js";
-import { publicConnectorCatalogEntry } from "../ingest/connectors/catalog/manifest.js";
-import { SourceOAuthError } from "../ingest/source-oauth.js";
-import {
-  DIRECT_CONNECTOR_CARDS,
-  isDirectConnectorId,
-  publicDirectConnectorCard,
-} from "../ingest/connectors/direct-catalog.js";
-import {
-  LOCAL_CONNECTOR_CARDS,
-  isLocalConnectorId,
-  publicLocalConnectorCard,
-} from "../ingest/connectors/local-catalog.js";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 import type { AgentAccessLevel, AuditOp, Identity, Namespace, PinTarget, Role, SetupInput, SourceKind, SyscallContext } from "../types.js";
@@ -36,7 +20,6 @@ import type { AgentAccessLevel, AuditOp, Identity, Namespace, PinTarget, Role, S
 // a hand-maintained subset silently dropped every op added after M5.
 import { AUDIT_OPS } from "../types.js";
 import { Kernel } from "../kernel.js";
-import { HaloApplicationRuntime } from "../application-runtime/index.js";
 import { AuthzError, isRole, isRootOwner, isSelfOrDescendant } from "../auth/index.js";
 import { assertAgentKeyScope } from "../auth/agent-scope.js";
 import { isHumanRole } from "../console/auth.js";
@@ -52,21 +35,13 @@ import {
   IdentityConflictError,
   isExternalProvider,
 } from "../console/identities.js";
-import { createHaloAgentsHandoffFromEnv } from "../console/halo-agents-handoff.js";
 import { SupabaseSsoService, supabaseSsoFromEnv } from "../console/sso.js";
 import { organizationSignupAllowed } from "../console/signup.js";
 import { buildMcpServer } from "../mcp/tools.js";
 import type { HttpServerDeps, HttpSyscalls } from "./server.js";
 import { BearerUnavailableError, isProductKeyType } from "../auth/key-types.js";
-import { CreditExhaustedError } from "../billing/meters.js";
 import type { MemManifestArgs } from "../discovery/manifest.js";
-import type { MemLiveResultArgs, MemLiveResultResult } from "../syscalls/index.js";
 import { SetupConflictError, validatePublicUrl } from "../setup/index.js";
-import {
-  MAX_OUTPUT_TOKENS_CEILING,
-  ModelAuthorizationError,
-  ModelValidationError,
-} from "../model-runtime/index.js";
 import { DurableRateLimitStore } from "../durable/rate-limit.js";
 import { BoundedHttpRedMetrics } from "../observability/http.js";
 import {
@@ -92,6 +67,7 @@ import {
 } from "../gateway/contracts.js";
 
 const AGENT_ID = "http";
+const MAX_OUTPUT_TOKENS_CEILING = 128_000;
 
 /** 400-mapped payload validation failure (see server.ts name-based mapping). */
 export class BadRequestError extends Error {
@@ -1081,26 +1057,6 @@ export function withSourceTokens(
   return tokens ? { ...payload, sourceTokens: tokens } : payload;
 }
 
-/**
- * M6 additive syscall surface: POST /v1/mem/live-result. Extends the module-B
- * HttpSyscalls structurally so a pre-M6 server keeps compiling; the handler is
- * present only when the kernel exposes memLiveResult (absent → the transport
- * 404s, matching the writeStatus idiom).
- */
-export interface HttpSyscallsX extends HttpSyscalls {
-  memLiveResult?(payload: Record<string, unknown>, identity: Identity, ctx?: SyscallContext): Promise<unknown>;
-}
-
-/** Structural view of the kernel's optional M6 federation method. */
-type LiveCapableKernel = Kernel & {
-  memLiveResult?(
-    args: MemLiveResultArgs,
-    identity: Identity,
-    agentId?: string,
-    ctx?: SyscallContext,
-  ): Promise<MemLiveResultResult>;
-};
-
 /** Admin scoping: root owner → anywhere; tenant owner/admin → own subtree. */
 function assertAdminScope(identity: Identity, ns: Namespace): void {
   if (isRootOwner(identity)) return;
@@ -1178,46 +1134,7 @@ async function issueKeyScoped(
 // M5 control-room helpers
 // ---------------------------------------------------------------------------
 
-const SOURCE_KINDS: readonly SourceKind[] = [
-  "filesystem",
-  "postgres",
-  "notion",
-  "slack",
-  ...DIRECT_CONNECTOR_CARDS.map((entry) => entry.id),
-  ...LOCAL_CONNECTOR_CARDS.map((entry) => entry.id),
-  ...PLATFORM_CONNECTOR_CATALOG.map((entry) => entry.id),
-];
-const RETIRED_NEW_CONNECTOR_IDS = new Set<string>([
-  "airtable",
-  "notion",
-  "notion_catalogue",
-  "notion_knowledge",
-  "google_drive_catalogue",
-  "google_drive_knowledge",
-  "google_docs_catalogue",
-  "google_docs_knowledge",
-  "google_sheets",
-]);
-
-function isRetiredNewConnector(id: string): boolean {
-  return RETIRED_NEW_CONNECTOR_IDS.has(id);
-}
-
-/**
- * The source cards S6 offers. Every other cartridge stays registered — existing
- * connections keep syncing and their rows keep rendering — but it is not part
- * of the browsable "Add a source" catalog.
- */
-const OFFERED_CONNECTOR_IDS = new Set<string>([
-  "linear_direct",
-  "airtable_direct",
-  "notion_direct",
-  "obsidian_vault",
-]);
-
-function isOfferedConnector(id: string): boolean {
-  return OFFERED_CONNECTOR_IDS.has(id);
-}
+const SOURCE_KINDS: readonly SourceKind[] = ["filesystem", "postgres", "obsidian_vault"];
 
 function isSourceKind(value: string): value is SourceKind {
   return (SOURCE_KINDS as readonly string[]).includes(value);
@@ -1478,8 +1395,6 @@ export interface BuildHttpDepsOptions {
   secureCookies?: boolean;
   /** Validated public origin for generated MCP snippets. */
   publicUrl?: string;
-  /** Optional application/agent model runtime; production creates one outside Kernel. */
-  applicationRuntime?: HaloApplicationRuntime;
   /** Override the env-derived Supabase SSO service (tests). Null disables SSO. */
   sso?: SupabaseSsoService | null;
   /** Override the env-derived GitHub OAuth service (tests). Null disables it. */
@@ -1490,42 +1405,6 @@ export function buildHttpDeps(
   kernel: Kernel,
   options: BuildHttpDepsOptions = {},
 ): HttpServerDeps {
-  const applicationRuntime = options.applicationRuntime ?? (
-    kernel instanceof Kernel ? new HaloApplicationRuntime(kernel) : null
-  );
-  const requireApplicationRuntime = (): HaloApplicationRuntime => {
-    if (!applicationRuntime) throw new BadRequestError("application model runtime unavailable");
-    return applicationRuntime;
-  };
-  if (applicationRuntime && kernel instanceof Kernel) {
-    // Production Postgres owns the durable fleet-wide backfill. Hermetic
-    // PGlite tests attach an explicit fake executor when exercising this lane.
-    if (kernel.config.databaseUrl) {
-      kernel.attachMemoryTitleExecutor((input) =>
-        applicationRuntime.completeMemoryTitle(input)
-      );
-    }
-    kernel.attachCopilotRoutineExecutor((input) =>
-      applicationRuntime.executeCopilotRoutine(input)
-    );
-    // C0 channels: an inbound provider message is one governed Halo Assistant
-    // turn under the server-resolved channel grant — same chokepoint, no prompt assembly
-    // here (D2), never a memory write from the transport (D10).
-    kernel.attachChannelCopilotExecutor(async (input) => {
-      const result = await applicationRuntime.completeChannelCopilot({
-        message: input.message,
-        history: input.history,
-        outputMode: input.outputMode,
-        turnId: input.turnId,
-        channelAuthority: input.channelAuthority,
-      }, input.identity);
-      return { text: result.text };
-    });
-  }
-  // M6: bind the optional federation method once so the live-result handler is
-  // absent (→ transport 404) on a kernel without the lane, present otherwise.
-  const liveKernel = kernel as LiveCapableKernel;
-  const memLiveResult = liveKernel.memLiveResult?.bind(liveKernel);
   const authRateLimits = new DurableRateLimitStore(kernel.db);
   // How many trusted reverse proxies sit in front of us. MUST match the real
   // topology: too low and every caller shares one rate-limit bucket (one actor
@@ -1537,7 +1416,6 @@ export function buildHttpDeps(
     return Number.isInteger(raw) && raw >= 0 ? raw : 0;
   })();
   const httpTelemetry = new BoundedHttpRedMetrics();
-  const haloAgents = createHaloAgentsHandoffFromEnv();
   // SSO (Supabase): built from SUPABASE_URL/SUPABASE_ANON_KEY unless a test
   // injects (or explicitly disables) it. Requires the real human-auth stores.
   // The link table is shared by both providers (GitHub + Google), so it is
@@ -1553,7 +1431,7 @@ export function buildHttpDeps(
             signup: kernel.organizationSignup,
             allowOrganizationSignup: organizationSignupAllowed(
               process.env,
-              kernel.earlyAccess.isEnabled(),
+              kernel.quota.isEnabled(),
             ),
             identities: externalIdentities,
           })
@@ -1613,7 +1491,7 @@ export function buildHttpDeps(
     if (unique.size !== scim.length) throw new Error("HALOMEM_SCIM_CONFIG tokens must be unique");
   }
 
-  const syscalls: HttpSyscallsX = {
+  const syscalls: HttpSyscalls = {
     memRead: (payload, identity, ctx) =>
       kernel.memRead(parse(readSchema, payload, "mem/read"), identity, AGENT_ID, ctx),
     memSearch: (payload, identity, ctx) =>
@@ -1672,13 +1550,6 @@ export function buildHttpDeps(
     listAgentAccessRequests: (identity) => kernel.listOwnAgentAccessRequests(identity),
     describeAgentAccess: (identity) => kernel.describeAgentAccess(identity),
     writeStatus: async (ticket, identity) => kernel.writeStatus(ticket, identity),
-    // M6 (D15): redeem a phase-2 live ticket. Unknown/expired/foreign tickets
-    // return the audited miss shape {found:false, live:null} — 200, not 404 —
-    // because "still nothing" is a valid answer, not a routing error.
-    memLiveResult: memLiveResult
-      ? (payload, identity, ctx) =>
-          memLiveResult(parse(liveResultSchema, payload, "mem/live-result"), identity, AGENT_ID, ctx)
-      : undefined,
     // M9 #6: payload arrives pre-validated by parseManifestArgs at the route.
     memManifest: (payload, identity) =>
       kernel.memManifest(payload as unknown as MemManifestArgs, identity, AGENT_ID),
@@ -1708,23 +1579,13 @@ export function buildHttpDeps(
     consoleDir: options.consoleDir,
     secureCookies: options.secureCookies,
     publicUrl: options.publicUrl,
-    ...(haloAgents ? { haloAgents } : {}),
 
     webhooks: {
       ingest: (sourceId, rawBody, timestamp, signature) =>
         kernel.ingestWebhookSource(sourceId, rawBody, timestamp, signature),
       obsidian: (sourceId, rawBody, timestamp, signature) =>
         kernel.ingestObsidianVault(sourceId, rawBody, timestamp, signature),
-      // M9 #1: HMAC-authenticated GitHub App event ingress (D9: namespace
-      // resolves from the registered source rows inside the kernel).
-      github: (rawBody, signature, event) =>
-        kernel.handleGitHubWebhook(rawBody, signature, event),
     },
-
-    // C0 channels: public webhook ingress + the S-screen control plane. All
-    // authority decisions live in the kernel channel services (audited, D4);
-    // this layer only adapts shapes and redacts projections.
-    channels: buildHttpChannels(kernel),
 
     // M9 #13 (E47): S10 chips, derived per the caller's resolved namespace.
     suggestedQuestions: (identity) => kernel.suggestedQuestions(identity),
@@ -1757,9 +1618,6 @@ export function buildHttpDeps(
       // M9 #11b (D29): opaque hmt_ bearer → server-resolved Identity, exactly
       // the API-key seam. The token service audits every miss and denial.
       resolveOauth: (token) => kernel.resolveOAuthIdentity(token),
-      resolveCopilotCapability: applicationRuntime
-        ? (token) => applicationRuntime.resolveCopilotMcpCapability(token)
-        : undefined,
       // M5 human sign-in: session cookie ↔ D9 Identity. Expiry + disabled are
       // enforced server-side in the kernel/SessionStore, never trusted from the
       // cookie. login returns null on any failure (no enumeration oracle).
@@ -1903,32 +1761,6 @@ export function buildHttpDeps(
     },
 
     syscalls,
-
-    copilot: {
-      listProfiles: (identity) => requireApplicationRuntime().listCopilotProfiles(identity),
-      probe: () => requireApplicationRuntime().probeCopilotRuntime(),
-      listConversations: (identity, limit, offset) =>
-        requireApplicationRuntime().listCopilotConversations(identity, limit, offset),
-      createConversation: (body, identity) => {
-        const input = parse(copilotConversationCreateSchema, body, "copilot/conversations");
-        return requireApplicationRuntime().createCopilotConversation(identity, input.title);
-      },
-      getConversation: (id, identity) =>
-        requireApplicationRuntime().getCopilotConversation(identity, id),
-      clearConversations: (identity) =>
-        requireApplicationRuntime().clearCopilotConversations(identity),
-      listRoutines: (identity) => kernel.listCopilotRoutines(identity),
-      createRoutine: (body, identity) =>
-        kernel.createCopilotRoutine(identity, parse(copilotRoutineCreateSchema, body, "copilot/routines")),
-      updateRoutine: (id, body, identity) =>
-        kernel.updateCopilotRoutine(identity, id, parse(copilotRoutineUpdateSchema, body, "copilot/routines/:id")),
-      deleteRoutine: (id, identity) => kernel.deleteCopilotRoutine(identity, id),
-      complete: (body, identity) =>
-        requireApplicationRuntime().completeCopilot(
-          parse(copilotCompleteSchema, body, "copilot/complete"),
-          identity,
-        ),
-    },
 
     admin: {
       async getPolicy(ns, identity) {
@@ -2257,75 +2089,6 @@ export function buildHttpDeps(
           parse(denyAgentAccessRequestSchema, body, "admin/agent-access/requests/deny"),
           identity,
         );
-      },
-      async listModelCatalog(identity) {
-        try {
-          return await requireApplicationRuntime().listCatalog(identity);
-        } catch (err) {
-          if (err instanceof ModelAuthorizationError) throw new AuthzError(err.message);
-          throw err;
-        }
-      },
-      async listModelConnections(identity) {
-        return requireApplicationRuntime().listConnections(identity);
-      },
-      async createModelConnection(body, identity) {
-        try {
-          return await requireApplicationRuntime().createConnection(
-            identity,
-            parse(modelConnectionSchema, body, "admin/model-connections"),
-          );
-        } catch (err) {
-          if (err instanceof ModelAuthorizationError) {
-            await auditModelFailure(kernel, identity, "model_connection_create denied", "denied");
-            throw new AuthzError(err.message);
-          }
-          await auditModelFailure(kernel, identity, "model_connection_create failed");
-          if (err instanceof ModelValidationError) throw new BadRequestError(err.message);
-          throw err;
-        }
-      },
-      async revokeModelConnection(id, identity) {
-        return { revoked: await requireApplicationRuntime().revokeConnection(identity, id) };
-      },
-      async listModelProfiles(identity) {
-        return requireApplicationRuntime().listProfiles(identity);
-      },
-      async createModelProfile(body, identity) {
-        try {
-          return await requireApplicationRuntime().createProfile(
-            identity,
-            parse(modelProfileSchema, body, "admin/model-profiles"),
-          );
-        } catch (err) {
-          if (err instanceof ModelAuthorizationError) {
-            await auditModelFailure(kernel, identity, "model_profile_create denied", "denied");
-            throw new AuthzError(err.message);
-          }
-          await auditModelFailure(kernel, identity, "model_profile_create failed");
-          if (err instanceof ModelValidationError) throw new BadRequestError(err.message);
-          throw err;
-        }
-      },
-      async updateModelProfile(id, body, identity) {
-        try {
-          return await requireApplicationRuntime().updateProfile(
-            identity,
-            id,
-            parse(modelProfileUpdateSchema, body, "admin/model-profiles"),
-          );
-        } catch (err) {
-          if (err instanceof ModelAuthorizationError) {
-            await auditModelFailure(kernel, identity, "model_profile_update denied", "denied");
-            throw new AuthzError(err.message);
-          }
-          await auditModelFailure(kernel, identity, "model_profile_update failed");
-          if (err instanceof ModelValidationError) throw new BadRequestError(err.message);
-          throw err;
-        }
-      },
-      async deleteModelProfile(id, identity) {
-        return { deleted: await requireApplicationRuntime().deleteProfile(identity, id) };
       },
       async listPins(namespace, identity) {
         assertReadScope(identity, namespace);
@@ -2763,117 +2526,24 @@ export function buildHttpDeps(
       },
 
       async connectors(_identity) {
-        // Only the offered cards are browsable. Retired ids stay excluded on
-        // their own gate so removing one from OFFERED_CONNECTOR_IDS can never
-        // resurrect a retired cartridge.
-        const platformCards = PLATFORM_CONNECTOR_CATALOG.filter(
-          (entry) => isOfferedConnector(entry.id) && !isRetiredNewConnector(entry.id),
-        );
-        // HaloMem-owned direct-OAuth cards (Linear, Airtable, Notion) render
-        // beside the platform catalog so an operator sees ONE card per
-        // provider. They carry no Nango mapping and collect no credential in
-        // the browser.
-        const directCards = DIRECT_CONNECTOR_CARDS.filter((card) => isOfferedConnector(card.id));
-        const localCards = LOCAL_CONNECTOR_CARDS.filter((card) => isOfferedConnector(card.id));
-        const categories: Record<string, number> = {};
-        for (const entry of platformCards) {
-          categories[entry.category] = (categories[entry.category] ?? 0) + 1;
-        }
-        for (const card of directCards) {
-          categories[card.category] = (categories[card.category] ?? 0) + 1;
-        }
-        for (const card of localCards) {
-          categories[card.category] = (categories[card.category] ?? 0) + 1;
-        }
         return {
-          total: platformCards.length + directCards.length + localCards.length,
-          categories,
-          connectors: [
-            ...directCards.map((card) => publicDirectConnectorCard(
-              card,
-              kernel.sourceOAuth.configured(card.provider),
-            )),
-            ...localCards.map((card) => publicLocalConnectorCard(card)),
-            ...platformCards.map((entry) => publicConnectorCatalogEntry(
-              entry,
-              Boolean(kernel.config.nangoIntegrations[entry.connectionKey]),
-            )),
-          ],
+          total: 1,
+          categories: { knowledge: 1 },
+          connectors: [{
+            id: "obsidian_vault",
+            connectionKey: "obsidian_vault",
+            name: "Obsidian",
+            category: "knowledge",
+            description: "Pair a local Obsidian vault with Halofy.",
+            auth: { type: "pairing", fields: [], managedBy: "local" },
+            connect: { kind: "local-pairing" },
+            managedAuth: { provider: "local", configured: true },
+            capabilities: { incremental: true, liveQuery: false, sourceAcl: false, webhook: true, oauth: false },
+            delivery: "webhook",
+            readiness: "executable",
+          }],
         };
       },
-
-      listSourceCredentials: (identity) => kernel.listSourceCredentials(identity),
-
-      async createSourceCredential(body, identity) {
-        const input = parse(sourceCredentialSchema, body, "admin/source-credentials");
-        if (isRetiredNewConnector(input.connectorId)) {
-          throw new BadRequestError(
-            `connector '${input.connectorId}' is retired for new connections`,
-          );
-        }
-        if (!kernel.connectorRegistry.get(input.connectorId as SourceKind)) {
-          throw new BadRequestError(`unknown connector '${input.connectorId}'`);
-        }
-        try {
-          return await kernel.createSourceCredential({
-            ...input,
-            connectorId: input.connectorId as import("../types.js").PlatformConnectorId,
-          }, identity);
-        } catch (error) {
-          if (error instanceof Error &&
-              /connection family|connectionKey|credential field|source field|is required|public HTTPS|provider allowlist|managed authorization/.test(error.message)) {
-            throw new BadRequestError(error.message);
-          }
-          throw error;
-        }
-      },
-
-      async createNangoConnectSession(body, identity) {
-        const input = parse(nangoConnectSessionSchema, body, "admin/nango/connect-sessions");
-        if (isRetiredNewConnector(input.connectorId)) {
-          throw new BadRequestError(
-            `connector '${input.connectorId}' is retired for new connections`,
-          );
-        }
-        if (!isPlatformConnectorId(input.connectorId)) {
-          throw new BadRequestError(`unknown connector '${input.connectorId}'`);
-        }
-        return kernel.createNangoConnectSession({
-          connectorId: input.connectorId,
-          name: input.name,
-        }, identity);
-      },
-
-      async completeNangoConnectSession(attemptId, body, identity) {
-        parse(emptyObjectSchema, body, "admin/nango/connect-sessions/complete");
-        if (!attemptId || attemptId.length > 256) {
-          throw new BadRequestError("invalid Nango connect attempt");
-        }
-        return kernel.completeNangoConnectSession(attemptId, identity);
-      },
-
-      // POST /v1/admin/connectors/oauth/:provider/start — direct connector
-      // OAuth (no Nango). Mints the provider authorize URL; the public
-      // callback below finishes registration under the initiating identity.
-      async startSourceOAuth(provider, body, identity) {
-        const input = parse(sourceOAuthStartSchema, body, "admin/connectors/oauth/start");
-        try {
-          return await kernel.sourceOAuth.start(identity, {
-            provider,
-            targetTeamId: input.targetTeamId ?? null,
-            selectedItemIds: input.selectedItemIds,
-            sourceKind: input.sourceKind,
-          });
-        } catch (err) {
-          if (err instanceof SourceOAuthError ||
-              (err instanceof Error && /active team|administrative subtree|own team/i.test(err.message))) {
-            throw new BadRequestError(err.message);
-          }
-          throw err;
-        }
-      },
-
-      sourceOAuthCallback: (input) => kernel.sourceOAuth.callback(input),
 
       async pairObsidian(body, identity) {
         const input = parse(obsidianPairSchema, body, "admin/connectors/obsidian/pair");
@@ -2897,19 +2567,9 @@ export function buildHttpDeps(
         if (!isSourceKind(input.kind)) {
           throw new BadRequestError(`invalid source kind '${input.kind}'`);
         }
-        if (isDirectConnectorId(input.kind)) {
-          throw new BadRequestError(
-            `connector '${input.kind}' must be created through its OAuth connect flow`,
-          );
-        }
-        if (isLocalConnectorId(input.kind)) {
+        if (input.kind === "obsidian_vault") {
           throw new BadRequestError(
             `connector '${input.kind}' must be created through its local pairing flow`,
-          );
-        }
-        if (isRetiredNewConnector(input.kind)) {
-          throw new BadRequestError(
-            `connector '${input.kind}' is retired for new connections`,
           );
         }
         try {
@@ -3029,22 +2689,12 @@ export function buildHttpDeps(
         }
         // Validate FIRST — a malformed request must never debit credits.
         const input = parse(consolidationRunSchema, body, "admin/consolidation/runs");
-        await kernel.consumeEarlyAccess(
+        await kernel.consumeQuota(
           identity,
           "consolidation",
           "automation_run",
           "manual-consolidation",
         );
-        // E40 (#21): a distillation pass is a metered lane — one distill_run
-        // debit per run, audited by the ledger; an exhausted balance degrades
-        // to a typed 402 refusal (the billing store being down fails open;
-        // a deployment without the credit system runs ungated).
-        const charge = await kernel.creditMeter?.charge(identity, "distill_run", {
-          reason: "manual-consolidation",
-        });
-        if (charge && !charge.ok && charge.state !== "error") {
-          throw new CreditExhaustedError("distill_run");
-        }
         try {
           return await kernel.consolidation.runManual(identity, input);
         } catch (error) {
@@ -3159,79 +2809,6 @@ export function buildHttpDeps(
         return kernel.readiness(identity);
       },
 
-      // #15 (E48–E50): S15 segmentation. The rollup clamps/defaults NaN itself.
-      async userAnalytics(query, identity) {
-        const num = (value: unknown): number | undefined =>
-          typeof value === "string" && value !== "" ? Number(value) : undefined;
-        return kernel.userAnalytics(identity, {
-          days: num(query.days),
-          limit: num(query.limit),
-        });
-      },
-
-      // Usage analytics / query traction. The rollup clamps/defaults itself;
-      // the derived outcome "miss" and team id-or-namespace resolution happen
-      // in the read model, so strings pass through untouched.
-      async usageQueries(query, identity) {
-        const num = (value: unknown): number | undefined =>
-          typeof value === "string" && value !== "" ? Number(value) : undefined;
-        const str = (value: unknown): string | undefined =>
-          typeof value === "string" && value !== "" ? value : undefined;
-        const principal = str(query.principal);
-        return kernel.usageQueries(identity, {
-          days: num(query.days),
-          limit: num(query.limit),
-          team: str(query.team),
-          actor: str(query.actor),
-          source: str(query.source),
-          principal: principal === "human" || principal === "agent" ? principal : undefined,
-          outcome: str(query.outcome),
-          cursor: str(query.cursor),
-        });
-      },
-      async usageQueryTrace(traceId, identity) {
-        return kernel.usageQueryTrace(identity, traceId);
-      },
-      async usageRollup(query, identity) {
-        const num = (value: unknown): number | undefined =>
-          typeof value === "string" && value !== "" ? Number(value) : undefined;
-        const groupBy = typeof query.groupBy === "string" ? query.groupBy : undefined;
-        return kernel.usageRollup(identity, {
-          days: num(query.days),
-          groupBy:
-            groupBy === "team" || groupBy === "actor" ||
-            groupBy === "agent" || groupBy === "source"
-              ? groupBy
-              : undefined,
-        });
-      },
-      async usageAiTurns(query, identity) {
-        const num = (value: unknown): number | undefined =>
-          typeof value === "string" && value !== "" ? Number(value) : undefined;
-        const actor = typeof query.actor === "string" && query.actor !== ""
-          ? query.actor
-          : undefined;
-        return kernel.usageAiTurns(identity, {
-          days: num(query.days),
-          limit: num(query.limit),
-          actor,
-        });
-      },
-      async usageAiTurnDetail(turnId, identity) {
-        return kernel.usageAiTurnDetail(identity, turnId);
-      },
-      async usageAiRollup(query, identity) {
-        const days = typeof query.days === "string" && query.days !== ""
-          ? Number(query.days)
-          : undefined;
-        const period = query.period === "month" ? "month" : undefined;
-        const rawGroup = typeof query.groupBy === "string" ? query.groupBy : undefined;
-        const groupBy = rawGroup === "team" || rawGroup === "actor" ||
-          rawGroup === "provider" || rawGroup === "model" || rawGroup === "sourceApp"
-          ? rawGroup
-          : undefined;
-        return kernel.usageAiRollup(identity, { days, period, groupBy });
-      },
       async assistantRecycleBin(identity) {
         return kernel.assistantRecycleBin(identity);
       },
@@ -3306,65 +2883,6 @@ export function buildHttpDeps(
       async queueKnowledgeSync(body, identity) {
         const target = parse(knowledgeSyncSchema, body, "admin/knowledge-sync");
         return kernel.queueKnowledgeSync(identity, target);
-      },
-
-      // #21 (E39): tenant-root credit summary; namespace comes from the
-      // resolved session identity, never a query param (D9).
-      async credits(query, identity) {
-        const limit =
-          typeof query.limit === "string" && query.limit !== ""
-            ? Number(query.limit)
-            : undefined;
-        return kernel.creditSummary(
-          identity,
-          limit !== undefined && Number.isFinite(limit) ? limit : undefined,
-        );
-      },
-
-      // W3 #22 (E53/E56): S2 usage panel. Target namespace is ALWAYS the
-      // caller's resolved identity (D9) — the strict schemas admit none.
-      // Authorization/validation errors map by name in the server
-      // (UsageCap*/UsageAlert* → 403/400).
-      async usageSummary(identity) {
-        return kernel.usageSummary(identity);
-      },
-      async setUsageCap(body, identity) {
-        return kernel.setUsageCap(identity, parse(usageCapSchema, body, "admin/usage/cap"));
-      },
-      async upsertUsageAlert(body, identity) {
-        const input = parse(usageAlertSchema, body, "admin/usage/alerts");
-        try {
-          return await kernel.upsertUsageAlert(identity, input);
-        } catch (err) {
-          // The store signals bad thresholds with RangeError — a caller error.
-          if (err instanceof RangeError) throw new BadRequestError(err.message);
-          throw err;
-        }
-      },
-
-      // #1 (E1/E2): GitHub App installation brokerage — summaries only.
-      async listGitHubInstallations(identity) {
-        return kernel.listGitHubInstallations(identity);
-      },
-      async startGitHubInstall(body, identity) {
-        return kernel.githubApp.startInstall(
-          parse(githubInstallStartSchema, body, "admin/github/installations"),
-          identity,
-        );
-      },
-      async approveGitHubInstall(id, body, identity) {
-        const input = parse(
-          githubInstallApproveSchema,
-          body,
-          "admin/github/installations/approve",
-        );
-        return kernel.githubApp.approveInstall(
-          { installationRequestId: id, installationId: input.installationId },
-          identity,
-        );
-      },
-      async revokeGitHubInstall(id, identity) {
-        return kernel.githubApp.revokeInstall({ installationRequestId: id }, identity);
       },
 
       // #11b (D29/E23–E24): OAuth client registry. The plaintext secret is
@@ -3592,511 +3110,6 @@ export function projectChannelConnection(
       memoryAllowed: grant.memoryAllowed,
       systemTest: grant.systemTest,
       expiresAt: grant.expiresAt,
-    },
-  };
-}
-
-function buildHttpChannels(kernel: Kernel): NonNullable<HttpServerDeps["channels"]> {
-  const services = kernel.channels;
-
-  const visibleOrThrow = async (
-    identity: Identity,
-    id: string,
-  ): Promise<ChannelConnectionValue> => {
-    const connection = await services.repositories.connections.getVisible(identity, id);
-    if (connection === null) throw new ChannelConnectionNotFoundError();
-    return connection;
-  };
-  const withGrant = async (
-    connection: ChannelConnectionValue,
-  ): Promise<Record<string, unknown>> => {
-    const [grant, confirmed] = await Promise.all([
-      services.repositories.connections.getActiveGrantExact(
-        connection.namespace,
-        connection.id,
-      ),
-      connection.kind === "google_chat" &&
-        connection.displayMetadata.installationMode === "managed"
-        ? kernel.db.query(
-            `SELECT 1 FROM channel_delivery_attempts
-              WHERE namespace = $1 AND connection_id = $2 AND state = 'confirmed'
-              LIMIT 1`,
-            [connection.namespace, connection.id],
-          ).then((result) => result.rows.length === 1)
-        : Promise.resolve(false),
-    ]);
-    return projectChannelConnection(connection, grant, confirmed);
-  };
-
-  const registerWebhookForConnection = async (
-    identity: Identity,
-    connection: ChannelConnectionValue,
-    input: { expectedRowVersion?: number; expectedAuthorityEpoch?: number },
-  ): Promise<{
-    connection: ChannelConnectionValue;
-    webhookUrl: string | null;
-    registeredWithProvider: boolean;
-  }> => {
-    const cartridge = services.cartridges.get(connection.kind);
-    if (!cartridge?.buildRegisterWebhookRequest || !cartridge.parseRegisterWebhookResponse ||
-        !cartridge.registerSecretTypes) {
-      let revealed = "";
-      const rotated = await services.lifecycle.registerWebhook(identity, {
-        namespace: connection.namespace,
-        connectionId: connection.id,
-        expectedRowVersion: input.expectedRowVersion ?? connection.rowVersion,
-        expectedAuthorityEpoch: input.expectedAuthorityEpoch ?? connection.authorityEpoch,
-        publicUrl: kernel.config.channelPublicUrl,
-        register: async (webhookUrl) => {
-          revealed = webhookUrl;
-          return { ok: true };
-        },
-      });
-      return { connection: rotated, webhookUrl: revealed, registeredWithProvider: false };
-    }
-    const secrets = await services.credentials.resolveActive({
-      namespace: connection.namespace,
-      connectionId: connection.id,
-      provider: connection.kind,
-      secretTypes: cartridge.registerSecretTypes,
-    });
-    try {
-      let serverDerivedTelegramInstallationKey: string | undefined;
-      if (connection.kind === "telegram") {
-        const token = Buffer.from(secrets.require("bot-token")).toString("utf8");
-        const botId = /^(\d{1,20}):/.exec(token)?.[1];
-        if (botId !== undefined) {
-          serverDerivedTelegramInstallationKey = `telegram:bot:${botId}`;
-        }
-      }
-      const updated = await services.lifecycle.registerWebhook(identity, {
-        namespace: connection.namespace,
-        connectionId: connection.id,
-        expectedRowVersion: input.expectedRowVersion ?? connection.rowVersion,
-        expectedAuthorityEpoch: input.expectedAuthorityEpoch ?? connection.authorityEpoch,
-        publicUrl: kernel.config.channelPublicUrl,
-        ...(serverDerivedTelegramInstallationKey === undefined
-          ? {}
-          : { serverDerivedTelegramInstallationKey }),
-        register: async (webhookUrl) => {
-          try {
-            const request = await cartridge.buildRegisterWebhookRequest!({ webhookUrl }, secrets);
-            const transport = kernel.config.channelFetch ?? fetch;
-            const response = await transport(`${cartridge.apiOrigin}${request.path}`, {
-              method: request.method,
-              headers: request.headers,
-              signal: AbortSignal.timeout(10_000),
-              ...(request.body ? { body: Buffer.from(request.body) } : {}),
-            });
-            return cartridge.parseRegisterWebhookResponse!(
-              response.status,
-              await response.text(),
-            );
-          } catch {
-            return { ok: false as const, code: "provider-unreachable" };
-          }
-        },
-      });
-      return { connection: updated, webhookUrl: null, registeredWithProvider: true };
-    } finally {
-      secrets.destroy();
-    }
-  };
-
-  return {
-    ingress: (kind, routeKey, raw) => kernel.acceptChannelIngress(kind, routeKey, raw),
-
-    oauthStart: (identity, connectionId) =>
-      services.oauth.start(identity, { connectionId }),
-    oauthCallback: (input) => services.oauth.callback(input),
-    managedGoogleChatStart: (identity) => services.googleChatManaged.start(identity),
-    managedGoogleChatStatus: (identity, setupId) =>
-      services.googleChatManaged.status(identity, setupId),
-
-    catalog: async (identity) => {
-      const googleIdentityLinked = identity.sessionUserId
-        ? (await kernel.db.query(
-            `SELECT 1 FROM user_external_identities
-              WHERE user_id = $1 AND provider = 'google'
-              LIMIT 1`,
-            [identity.sessionUserId],
-          )).rows.length === 1
-        : false;
-      const connections = await services.repositories.connections.listVisible(identity, 100);
-      const confirmedManaged = new Set<string>();
-      await Promise.all(connections.map(async (connection) => {
-        if (connection.kind !== "google_chat" ||
-            connection.displayMetadata.installationMode !== "managed") return;
-        const result = await kernel.db.query(
-          `SELECT 1 FROM channel_delivery_attempts
-            WHERE namespace = $1 AND connection_id = $2 AND state = 'confirmed'
-            LIMIT 1`,
-          [connection.namespace, connection.id],
-        );
-        if (result.rows.length === 1) confirmedManaged.add(connection.id);
-      }));
-      const byKind = new Map<string, ChannelConnectionValue[]>();
-      for (const connection of connections) {
-        const list = byKind.get(connection.kind) ?? [];
-        list.push(connection);
-        byKind.set(connection.kind, list);
-      }
-      const { CHANNEL_CATALOG } = await import("../channels/catalog.js");
-      return {
-        channels: CHANNEL_CATALOG.map((entry) => {
-          const kindConnections = byKind.get(entry.id) ?? [];
-          const live = kindConnections.filter((connection) =>
-            connection.lifecycleState === "active" &&
-            (connection.kind !== "google_chat" ||
-              connection.displayMetadata.installationMode !== "managed" ||
-              confirmedManaged.has(connection.id)));
-          const degraded = kindConnections.some(
-            (connection) => connection.healthState === "degraded" ||
-              connection.healthState === "failed",
-          );
-          const state = kindConnections.length === 0
-            ? entry.state
-            : degraded
-              ? "degraded"
-              : live.length > 0
-                ? "connected"
-                : "setup_required";
-          const platform = kernel.channels.platformReadiness[entry.id];
-          return {
-            id: entry.id,
-            name: entry.name,
-            category: entry.category,
-            runtimeCohort: entry.runtimeCohort,
-            capabilities: entry.capabilities,
-            prerequisites: entry.prerequisites,
-            form: entry.form,
-            state,
-            connectionCount: entry.id === "google_chat"
-              ? kindConnections.filter((connection) =>
-                  connection.displayMetadata.installationMode !== "managed" ||
-                  confirmedManaged.has(connection.id)).length
-              : kindConnections.length,
-            // Deployment-level readiness for click-to-connect providers:
-            // booleans only, so the console can say "not configured on this
-            // deployment" instead of a dead Connect button.
-            ...(platform === undefined
-              ? {}
-              : {
-                  platform: entry.id === "google_chat"
-                    ? { ...platform, identityLinked: googleIdentityLinked }
-                    : platform,
-                }),
-          };
-        }),
-      };
-    },
-
-    listConnections: async (identity) => {
-      const connections = await services.repositories.connections.listVisible(identity, 100);
-      return { connections: await Promise.all(connections.map(withGrant)) };
-    },
-
-    getConnection: async (identity, id) => {
-      const connection = await services.repositories.connections.getVisible(identity, id);
-      return connection === null ? null : withGrant(connection);
-    },
-
-    createConnection: async (identity, body) => {
-      const input = parse(channelCreateSchema, body, "channels/create");
-      // Click-to-connect providers may omit the installation key: OAuth binds
-      // the verified provider identity later. The placeholder can never match
-      // an installation claim, so ingress stays fail-closed until then.
-      //
-      // For OAuth-managed kinds a caller-supplied installation key is REFUSED,
-      // not honoured: the app-scoped ingress lane (Slack today) routes purely
-      // on the installation key, so accepting a caller-asserted `slack:app:…`
-      // would let one tenant claim another workspace's key and receive its
-      // messages (D9). Only the verified OAuth token exchange may ever write a
-      // real installation key for these kinds.
-      const { isOAuthManagedChannelKind } = await import("../channels/oauth.js");
-      if (isOAuthManagedChannelKind(input.kind) &&
-          input.providerInstallationKey !== undefined) {
-        throw new BadRequestError(
-          `channels/create: ${input.kind} binds its installation through OAuth; do not supply providerInstallationKey`,
-        );
-      }
-      const providerInstallationKey = input.providerInstallationKey ??
-        `pending:oauth:${randomBytes(16).toString("hex")}`;
-      const { connection, routeKey } = await services.lifecycle.create(identity, {
-        namespace: identity.namespace,
-        kind: input.kind,
-        ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
-        ...(input.displayMetadata === undefined
-          ? {}
-          : { displayMetadata: input.displayMetadata }),
-        providerInstallationKey,
-      });
-      const base = kernel.config.channelPublicUrl || "";
-      return {
-        connection: projectChannelConnection(connection, null),
-        // Shown exactly once at creation; only its sha256 is stored (D9).
-        routeKey,
-        webhookUrl: `${base}/v1/channels/ingress/${connection.kind}/${routeKey}`,
-      };
-    },
-
-    setCredentials: async (identity, id, body) => {
-      const input = parse(channelCredentialsSchema, body, "channels/credentials");
-      const connection = await visibleOrThrow(identity, id);
-      const secrets: Record<string, Uint8Array> = {};
-      for (const [secretType, value] of Object.entries(input.secrets)) {
-        secrets[secretType] = Buffer.from(value, "utf8");
-      }
-      if (connection.credentialVersion === 0) {
-        await services.credentials.createVersion({
-          context: {
-            environment: kernel.config.channelEnvironment,
-            tenantRoot: connection.tenantRoot,
-            namespace: connection.namespace,
-            connectionId: connection.id,
-            provider: connection.kind,
-            credentialVersion: 1,
-          },
-          secrets,
-          actor: identity,
-        });
-      } else {
-        await services.credentials.rotate({
-          namespace: connection.namespace,
-          connectionId: connection.id,
-          expectedCredentialVersion:
-            input.expectedCredentialVersion ?? connection.credentialVersion,
-          secrets,
-          actor: identity,
-        });
-      }
-      return withGrant(await visibleOrThrow(identity, id));
-    },
-
-    assignAgent: async (identity, id, body) => {
-      const input = parse(channelAssignSchema, body, "channels/assign");
-      const connection = await visibleOrThrow(identity, id);
-      const updated = await services.lifecycle.assignAgent(identity, {
-        namespace: connection.namespace,
-        connectionId: connection.id,
-        keyId: input.keyId,
-        inboundAllowed: input.inboundAllowed,
-        outboundAllowed: input.outboundAllowed,
-        memoryAllowed: input.memoryAllowed ?? false,
-        expectedRowVersion: input.expectedRowVersion ?? connection.rowVersion,
-        expectedAuthorityEpoch: input.expectedAuthorityEpoch ?? connection.authorityEpoch,
-        expiresAt: input.expiresAt ?? null,
-      });
-      return withGrant(updated);
-    },
-
-    assignAssistant: async (identity, id, body) => {
-      const input = parse(channelTransitionSchema, body, "channels/assistant");
-      const connection = await visibleOrThrow(identity, id);
-      const updated = await services.lifecycle.assignAssistant(identity, {
-        namespace: connection.namespace,
-        connectionId: connection.id,
-        expectedRowVersion: input.expectedRowVersion ?? connection.rowVersion,
-        expectedAuthorityEpoch: input.expectedAuthorityEpoch ?? connection.authorityEpoch,
-      });
-      return withGrant(updated);
-    },
-
-    setupTelegram: async (identity, id, body) => {
-      const input = parse(channelTelegramSetupSchema, body, "channels/telegram-setup");
-      let connection = await visibleOrThrow(identity, id);
-      if (connection.kind !== "telegram") {
-        throw new BadRequestError("channels/telegram-setup: Telegram connection required");
-      }
-      if (connection.lifecycleState === "disconnected") {
-        throw new BadRequestError("channels/telegram-setup: disconnected connections cannot be reconfigured");
-      }
-      const expectedRowVersion = input.expectedRowVersion ?? connection.rowVersion;
-      const expectedAuthorityEpoch = input.expectedAuthorityEpoch ?? connection.authorityEpoch;
-      if (expectedRowVersion !== connection.rowVersion ||
-          expectedAuthorityEpoch !== connection.authorityEpoch) {
-        throw new BadRequestError("channels/telegram-setup: connection state changed; refresh and retry");
-      }
-      const secrets = {
-        "bot-token": Buffer.from(input.botToken, "utf8"),
-        "webhook-secret": Buffer.from(randomBytes(32).toString("base64url"), "utf8"),
-      };
-      if (connection.credentialVersion === 0) {
-        await services.credentials.createVersion({
-          context: {
-            environment: kernel.config.channelEnvironment,
-            tenantRoot: connection.tenantRoot,
-            namespace: connection.namespace,
-            connectionId: connection.id,
-            provider: "telegram",
-            credentialVersion: 1,
-          },
-          secrets,
-          actor: identity,
-        });
-      } else {
-        await services.credentials.rotate({
-          namespace: connection.namespace,
-          connectionId: connection.id,
-          expectedCredentialVersion: connection.credentialVersion,
-          secrets,
-          actor: identity,
-        });
-      }
-      connection = await visibleOrThrow(identity, id);
-      connection = await services.lifecycle.assignAssistant(identity, {
-        namespace: connection.namespace,
-        connectionId: connection.id,
-        expectedRowVersion: connection.rowVersion,
-        expectedAuthorityEpoch: connection.authorityEpoch,
-      });
-      connection = (await registerWebhookForConnection(identity, connection, {
-        expectedRowVersion: connection.rowVersion,
-        expectedAuthorityEpoch: connection.authorityEpoch,
-      })).connection;
-      if (connection.lifecycleState === "draft") {
-        connection = await services.lifecycle.activate(identity, {
-          namespace: connection.namespace,
-          connectionId: connection.id,
-          expectedRowVersion: connection.rowVersion,
-          expectedAuthorityEpoch: connection.authorityEpoch,
-        });
-      }
-      if (!connection.outboundAuthority) {
-        connection = await services.lifecycle.cutover(identity, {
-          namespace: connection.namespace,
-          connectionId: connection.id,
-          expectedRowVersion: connection.rowVersion,
-          expectedAuthorityEpoch: connection.authorityEpoch,
-        });
-      }
-      return withGrant(connection);
-    },
-
-    transition: async (identity, id, op, body) => {
-      const input = parse(channelTransitionSchema, body, `channels/${op}`);
-      const connection = await visibleOrThrow(identity, id);
-      const transitionInput = {
-        namespace: connection.namespace,
-        connectionId: connection.id,
-        expectedRowVersion: input.expectedRowVersion ?? connection.rowVersion,
-        expectedAuthorityEpoch: input.expectedAuthorityEpoch ?? connection.authorityEpoch,
-      };
-      const updated = op === "pause"
-        ? await services.lifecycle.pause(identity, transitionInput)
-        : op === "resume"
-          ? await services.lifecycle.resume(identity, transitionInput)
-          : op === "activate"
-            ? await services.lifecycle.activate(identity, transitionInput)
-            : op === "cutover"
-              ? await services.lifecycle.cutover(identity, transitionInput)
-              : op === "rollback"
-                ? await services.lifecycle.rollback(identity, transitionInput)
-                : op === "delete"
-                  ? await services.lifecycle.delete(identity, transitionInput)
-                  : await services.lifecycle.disconnect(identity, transitionInput);
-      // The delete projection is the final pre-delete snapshot; its grants
-      // are gone, so skip the grant lookup rather than query deleted rows.
-      return op === "delete"
-        ? projectChannelConnection(updated, null)
-        : withGrant(updated);
-    },
-
-    registerWebhook: async (identity, id, body) => {
-      const input = parse(channelTransitionSchema, body, "channels/webhook");
-      const connection = await visibleOrThrow(identity, id);
-      const cartridge = services.cartridges.get(connection.kind);
-      // Providers with no registration API (Slack, Discord, Teams, Google
-      // Chat) need the endpoint pasted into their own console. Only the route
-      // key's hash is stored, so "show me the URL again" is necessarily a
-      // rotation — the same operation, minus the provider call.
-      if (!cartridge?.buildRegisterWebhookRequest || !cartridge.parseRegisterWebhookResponse ||
-          !cartridge.registerSecretTypes) {
-        let revealed = "";
-        const rotated = await services.lifecycle.registerWebhook(identity, {
-          namespace: connection.namespace,
-          connectionId: connection.id,
-          expectedRowVersion: input.expectedRowVersion ?? connection.rowVersion,
-          expectedAuthorityEpoch: input.expectedAuthorityEpoch ?? connection.authorityEpoch,
-          publicUrl: kernel.config.channelPublicUrl,
-          register: async (webhookUrl) => {
-            revealed = webhookUrl;
-            return { ok: true };
-          },
-        });
-        return {
-          connection: await withGrant(rotated),
-          // Shown exactly once, like the create-time reveal: the caller must
-          // paste it into the provider console now.
-          webhookUrl: revealed,
-          registeredWithProvider: false,
-        };
-      }
-      const registerSecretTypes = cartridge.registerSecretTypes;
-      const secrets = await services.credentials.resolveActive({
-        namespace: connection.namespace,
-        connectionId: connection.id,
-        provider: connection.kind,
-        secretTypes: registerSecretTypes,
-      });
-      try {
-        let serverDerivedTelegramInstallationKey: string | undefined;
-        if (connection.kind === "telegram") {
-          const token = Buffer.from(secrets.require("bot-token")).toString("utf8");
-          const botId = /^(\d{1,20}):/.exec(token)?.[1];
-          if (botId !== undefined) {
-            serverDerivedTelegramInstallationKey = `telegram:bot:${botId}`;
-          }
-        }
-        const updated = await services.lifecycle.registerWebhook(identity, {
-          namespace: connection.namespace,
-          connectionId: connection.id,
-          expectedRowVersion: input.expectedRowVersion ?? connection.rowVersion,
-          expectedAuthorityEpoch: input.expectedAuthorityEpoch ?? connection.authorityEpoch,
-          publicUrl: kernel.config.channelPublicUrl,
-          ...(serverDerivedTelegramInstallationKey === undefined
-            ? {}
-            : { serverDerivedTelegramInstallationKey }),
-          register: async (webhookUrl) => {
-            try {
-              const request = await cartridge.buildRegisterWebhookRequest!({ webhookUrl }, secrets);
-              const transport = kernel.config.channelFetch ?? fetch;
-              // The route-key rotation is committed with this call, so the
-              // request runs inside a row lock: a provider that never answers
-              // must not hold it open indefinitely.
-              const response = await transport(`${cartridge.apiOrigin}${request.path}`, {
-                method: request.method,
-                headers: request.headers,
-                signal: AbortSignal.timeout(10_000),
-                ...(request.body ? { body: Buffer.from(request.body) } : {}),
-              });
-              return cartridge.parseRegisterWebhookResponse!(
-                response.status,
-                await response.text(),
-              );
-            } catch {
-              return { ok: false as const, code: "provider-unreachable" };
-            }
-          },
-        });
-        return {
-          connection: await withGrant(updated),
-          webhookUrl: null,
-          registeredWithProvider: true,
-        };
-      } finally {
-        secrets.destroy();
-      }
-    },
-
-    listEvents: async (identity, id) => {
-      const connection = await visibleOrThrow(identity, id);
-      const events = await services.repositories.events.listOperational(
-        identity,
-        connection.id,
-        50,
-      );
-      return { events };
     },
   };
 }

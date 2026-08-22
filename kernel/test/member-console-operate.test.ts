@@ -28,22 +28,20 @@ function ui() {
 }
 
 describe("member operating console", () => {
-  it("gives members the exact operating screens and keeps usage analytics outside Govern", async () => {
+  it("gives members the exact standalone operating screens", async () => {
     const source = await readFile(
       fileURLToPath(new URL("../console/app.js", import.meta.url)),
       "utf8",
     );
 
     expect(source).toContain(
-      'member: ["s2", "s5", "s6", "s14", "s10", "s16", "s15", "s18"]',
+      'member: ["s2", "s5", "s6", "s14", "s16", "s18"]',
     );
     const operate = source.slice(source.indexOf('group: "Operate"'), source.indexOf('group: "Govern"'));
     const govern = source.slice(source.indexOf('group: "Govern"'), source.indexOf('group: "Onboard"'));
-    expect(operate).toContain('{ s: "s15", icon: "score", label: "Usage analytics", memberOperate: true }');
-    expect(govern).toContain('{ s: "s15", icon: "score", label: "Usage analytics", governance: true }');
-    expect(source).toContain('if (item.memberOperate === true && !operatingMember) return false;');
-    expect(source).toContain('if (item.governance === true && operatingMember) return false;');
-    for (const governed of ["s13", "s3", "s19", "s4", "s7", "s11", "s8", "s20", "s17", "s12"]) {
+    expect(operate).not.toContain('label: "Usage analytics"');
+    expect(govern).not.toContain('label: "Usage analytics"');
+    for (const governed of ["s13", "s3", "s19", "s4", "s7", "s11", "s8", "s20", "s17"]) {
       expect(source).not.toMatch(new RegExp(`member:\\s*\\[[^\\]]*"${governed}"`));
     }
   });

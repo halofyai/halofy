@@ -12,7 +12,7 @@
  *   T1  mem_write: extract 2 facts from a fake support transcript
  *   T2  mem_search: hybrid vector+BM25 retrieval over the new facts
  *   T3  mem_fault: a question L2 cannot answer, served from the L3 cold tier
- *   T4  mem_write: conflicting update — old address superseded, never deleted
+ *   T4  mem_write: capture a changed address with the deterministic stub
  *   T5  mem_stats + the audit trail (every op above left a row)
  *   T6  import + fragmentation (M3, D10): a legacy CRM dump is imported through
  *       the SAME write path (provenance source='swap-import'), a second team's
@@ -27,9 +27,8 @@ import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Kernel } from "./kernel.js";
 import { renderFragmentationMarkdown } from "./ingest/fragmentation.js";
-import { PostgresConnector } from "./ingest/connectors/postgres.js";
 import type { WriteResult } from "./types.js";
-import type { MemLiveResultResult, MemWriteResult } from "./syscalls/index.js";
+import type { MemWriteResult } from "./syscalls/index.js";
 
 const NS = "org/support/agent-1";
 const ACTOR = "user:dana";
@@ -181,7 +180,7 @@ async function main(): Promise<void> {
   }
 
   // -------------------------------------------------------------------------
-  step("T4", "mem_write - customer moved; the old address is superseded, not erased");
+  step("T4", "mem_write - capture the customer's changed address");
   const w2 = sync(
     await kernel.memWrite(
       {
@@ -394,128 +393,6 @@ async function main(): Promise<void> {
     `audit trail intact: ${forgetAudit.length} 'forget' row(s) recorded (the erased content's ` +
       `history is never deleted - D4)`,
   );
-
-  // -------------------------------------------------------------------------
-  step("T8", "federation (M6) - pointer catalog, L4 live fetch, two-phase answer, cache supersedence");
-
-  // (a) Register a fixture postgres source: credentialMode 'service', the
-  //     service secret sealed at rest by the M4 source-config cipher. The live
-  //     query surface is an in-process fixture (functions cannot ride in the
-  //     sealed config) — zero network.
-  const fulfillmentRows = [
-    { id: 41, order_ref: "ORD-9310", status: "shipped", carrier: "UPS", eta: "Friday" },
-  ];
-  const fixtureSql: string[] = [];
-  const fixtureQuery = async (sql: string): Promise<{ rows: unknown[] }> => {
-    fixtureSql.push(sql.trim().split("\n")[0]!);
-    if (/information_schema/.test(sql)) {
-      return {
-        rows: [
-          { column_name: "id", data_type: "integer" },
-          { column_name: "order_ref", data_type: "text" },
-          { column_name: "status", data_type: "text" },
-          { column_name: "carrier", data_type: "text" },
-          { column_name: "eta", data_type: "text" },
-        ],
-      };
-    }
-    if (/^SELECT \* FROM/.test(sql)) return { rows: fulfillmentRows };
-    return { rows: [] };
-  };
-  const liveSource = await kernel.registerSource(
-    "postgres",
-    { credentialMode: "service", serviceSecret: "postgres://fulfillment.internal/orders" },
-    orgIdentity,
-  );
-  kernel.registerLiveConnector(liveSource.id, new PostgresConnector({ query: fixtureQuery }));
-  console.log(
-    `registered live source ${liveSource.id} (kind=postgres, credentialMode=service - secret sealed at rest)`,
-  );
-
-  // (b) Mint the pointer catalog (D11: pointers are facts; search is the router).
-  const minted = await kernel.mintPointers(liveSource.id, identity, [
-    {
-      sourceRef: "orders",
-      description:
-        "Postgres table orders in the fulfillment source: columns id, order_ref, status, carrier, eta. " +
-        "Live order shipment status rows.",
-    },
-  ]);
-  console.log(`pointer catalog: minted=${minted.minted} superseded=${minted.superseded}`);
-
-  // (c) Phase 1: a natural-language fault that misses local memory. The pointer
-  //     matches, so the answer carries a running live confirmation + ticket.
-  const fedFault1 = await kernel.memFault(
-    { query: "shipment status carrier eta of order ORD-9310" },
-    identity,
-    AGENT,
-  );
-  console.log(
-    `phase 1: hit=${fedFault1.hit} source=${fedFault1.source} live=${fedFault1.liveStatus?.state ?? "none"}`,
-  );
-  if (fedFault1.liveStatement) console.log(`  agent sees: "${trunc(fedFault1.liveStatement, 120)}"`);
-  const fedTicket1 = fedFault1.liveStatus?.ticket;
-  if (!fedTicket1) throw new Error("federated fault did not start a live confirmation");
-
-  // (d) Phase 2: redeem the ticket. The live rows went BACK THROUGH the write
-  //     path (D10: extraction + verification + provenance) as cached facts
-  //     (cache=true, ttl=3600s) — blocks are built from the stored facts only.
-  const redeem = async (ticket: string): Promise<MemLiveResultResult> => {
-    let out = await kernel.memLiveResult({ ticket }, identity, AGENT);
-    for (let i = 0; i < 100 && out.live?.state === "running"; i++) {
-      await new Promise((r) => setTimeout(r, 25));
-      out = await kernel.memLiveResult({ ticket }, identity, AGENT);
-    }
-    return out;
-  };
-  const fedLive1 = await redeem(fedTicket1);
-  if (!fedLive1.live || fedLive1.live.state !== "done") throw new Error("live confirmation did not complete");
-  console.log(
-    `phase 2: state=${fedLive1.live.state} blocks=${fedLive1.live.blocks.length} ` +
-      `sources=${fedLive1.live.sources.map((s) => s.outcome).join(",")} (read-only session: ${fixtureSql[0]})`,
-  );
-  for (const b of fedLive1.live.blocks) console.log(`  [confirmed] ${b.ref}: ${trunc(b.content, 90)}`);
-  const cachedId = fedLive1.live.blocks[0]?.ref;
-  if (!cachedId) throw new Error("live fetch cached no facts");
-
-  // (e) The source changes; a second fault answers from the CACHED fact NOW and
-  //     re-confirms live — the contradicting live row supersedes the stale
-  //     cached fact through the normal D7 chain (closed + linked, never deleted).
-  fulfillmentRows[0] = { id: 41, order_ref: "ORD-9310", status: "delayed", carrier: "UPS", eta: "Friday" };
-  const fedFault2 = await kernel.memFault(
-    { query: "shipment status carrier eta of order ORD-9310" },
-    identity,
-    AGENT,
-  );
-  const fedTicket2 = fedFault2.liveStatus?.ticket;
-  console.log(
-    `second fault: answers from cache NOW (hit=${fedFault2.hit} source=${fedFault2.source}), live re-confirmation ${fedTicket2 ? "running" : "MISSING"}`,
-  );
-  if (!fedTicket2) throw new Error("cached answer did not re-confirm live");
-  const fedLive2 = await redeem(fedTicket2);
-  if (!fedLive2.live || fedLive2.live.state !== "done") throw new Error("second live confirmation did not complete");
-  console.log(
-    `phase 2 again: blocks=${fedLive2.live.blocks.length} superseded=${fedLive2.live.superseded.length}`,
-  );
-  if (!fedLive2.live.superseded.includes(cachedId)) {
-    throw new Error("contradicting live row did not supersede the stale cached fact");
-  }
-  const staleRow = await kernel.db.query(
-    "SELECT t_valid_to FROM memory_objects WHERE id = $1",
-    [cachedId],
-  );
-  const freshRow = await kernel.db.query(
-    "SELECT supersedes FROM memory_objects WHERE id = $1",
-    [fedLive2.live.blocks[0]!.ref],
-  );
-  console.log(
-    `  stale cached fact ${cachedId}: tValidTo=${(staleRow.rows[0] as { t_valid_to: unknown }).t_valid_to} ` +
-      `(closed, kept - D7); new fact supersedes=${(freshRow.rows[0] as { supersedes: unknown }).supersedes}`,
-  );
-  const l4Audit = (await kernel.audit.list(NS, { limit: 50 })).filter((e) =>
-    e.detail?.startsWith("l4_source="),
-  );
-  console.log(`  l4 audit rows (one per dispatch, D4): ${l4Audit.length} - ${l4Audit[0]?.detail ?? ""}`);
 
   await kernel.close();
   await fs.rm(knowledgeDir, { recursive: true, force: true });

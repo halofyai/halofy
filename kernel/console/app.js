@@ -14,7 +14,6 @@
  * through ctx.esc() - the only XSS defense.
  */
 
-import { createAssistantDock } from "./assistant-dock.js";
 import {
   confirmationFor,
   createActionToaster,
@@ -500,7 +499,7 @@ const ROLE_SCREENS = {
   // the non-admin /v1/skills routes; governance actions stay owner/admin.
   // s15 (usage analytics) is member-visible: the usage rollup/ledger GETs are
   // scoped server-side to the caller's own namespace subtree.
-  member: ["s2", "s5", "s6", "s14", "s10", "s16", "s15", "s18"],
+  member: ["s2", "s5", "s6", "s14", "s16", "s18"],
   // The policy library has a true auditor read model; scorecard remains hidden
   // because its current route runs a benchmark rather than performing a read.
   // s15 (user analytics) is a read-only GET the server carves out for the
@@ -514,15 +513,15 @@ const ROLE_SCREENS = {
   // s20 (export) is owner/admin/auditor: the server's EXPORT_ROLES
   // (src/export/index.ts) admits exactly those three, so the rail matches the
   // gate and member/agent never see a screen that would 403.
-  auditor: ["s2", "s5", "s6", "s14", "s10", "s21", "s3", "s13", "s4", "s7", "s8", "s11", "s15", "s20", "s18"],
+  auditor: ["s2", "s5", "s6", "s14", "s3", "s13", "s4", "s7", "s8", "s11", "s20", "s18"],
   // s19 (alerts) is owner/admin only: both of its endpoints and both of its
   // decisions are owner/admin server-side, and an inbox that renders "all
   // clear" because the read was refused is worse than no inbox at all.
-  admin: ["s2", "s5", "s6", "s14", "s10", "s21", "s16", "s9", "s3", "s19", "s13", "s4", "s7", "s8", "s11", "s15", "s17", "s12", "s20", "s18"],
+  admin: ["s2", "s5", "s6", "s14", "s16", "s9", "s3", "s19", "s13", "s4", "s7", "s8", "s11", "s17", "s20", "s18"],
   // s22 (billing) is OWNER-ONLY on purpose: it renders the tenant's early
   // access period, allowances, and (later) plan/payment state - commercial
   // terms are the account owner's surface, not an admin operating concern.
-  owner: ["s2", "s5", "s6", "s14", "s10", "s21", "s16", "s9", "s3", "s19", "s13", "s4", "s7", "s8", "s11", "s15", "s17", "s12", "s20", "s18", "s22"],
+  owner: ["s2", "s5", "s6", "s14", "s16", "s9", "s3", "s19", "s13", "s4", "s7", "s8", "s11", "s17", "s20", "s18"],
 };
 // M10 (D41): the session payload now carries PRODUCT roles. `root` maps to
 // the owner rail; a member holding the audit:read entitlement (a legacy
@@ -579,8 +578,6 @@ const NAV = [
       { s: "s5", icon: "map", label: "Memory" },
       { s: "s6", icon: "src", label: "Sources" },
       { s: "s14", icon: "plug", label: "Agent connections" },
-      { s: "s10", icon: "bot", label: "Assistant" },
-      { s: "s21", icon: "plug", label: "Channels" },
       {
         action: "haloAgents",
         capability: "haloAgents",
@@ -588,7 +585,6 @@ const NAV = [
         label: "Halo Agents",
       },
       { s: "s16", icon: "spark", label: "Skills" },
-      { s: "s15", icon: "score", label: "Usage analytics", memberOperate: true },
       // BOXED — see BOXED_SCREENS. The entry stays so un-boxing is a one-line
       // change; screensFor() strips the id, so this never renders today.
       { s: "s9", icon: "score", label: "Retrieval quality" },
@@ -606,10 +602,7 @@ const NAV = [
       { s: "s11", icon: "scales", label: "Conflicts" },
       { s: "s8", icon: "shield", label: "Audit" },
       { s: "s20", icon: "download", label: "Export" },
-      { s: "s15", icon: "score", label: "Usage analytics", governance: true },
-      { s: "s22", icon: "card", label: "Billing" },
       { s: "s17", icon: "key", label: "Connected apps" },
-      { s: "s12", icon: "model", label: "AI models" },
     ],
   },
   {
@@ -780,15 +773,8 @@ function renderRail(identity) {
       : fullAccess;
   if (gateMode === "setup") allowedScreens.add(SETUP_SCREEN);
   let html = "";
-  const auditMember =
-    identity.role === "member" &&
-    Array.isArray(identity.entitlements) &&
-    identity.entitlements.indexOf("audit:read") !== -1;
-  const operatingMember = identity.role === "member" && !auditMember;
   const groups = NAV.map((grp) => {
     const items = grp.items.filter((item) => {
-      if (item.memberOperate === true && !operatingMember) return false;
-      if (item.governance === true && operatingMember) return false;
       if (!item.s) {
         return gateMode === null && identity.capabilities?.[item.capability] === true;
       }
@@ -992,7 +978,6 @@ function paintBreadcrumbs(screenId, tail = []) {
 // ---------------------------------------------------------------------------
 
 const DEFAULT_SCREEN = "s2";
-const ASSISTANT_SCREEN = "s10";
 let currentModule = null;
 let actionToaster = null;
 const screenRefreshOwners = new WeakMap();
@@ -1004,8 +989,6 @@ const screenRefreshOwners = new WeakMap();
 // setup gate is locked, and never on S10 itself (the full screen IS the dock,
 // larger). Availability is re-derived on every navigation.
 // ---------------------------------------------------------------------------
-
-let assistantDock = null;
 
 /**
  * The command palette. Like the dock it introduces no new authority: it offers
@@ -1024,16 +1007,7 @@ function finishInitialScreenLoad() {
   notificationCenter?.syncAccess();
 }
 
-function assistantDockAvailable() {
-  return (
-    gateMode === null &&
-    allowedScreens.has(ASSISTANT_SCREEN) &&
-    currentScreenId !== ASSISTANT_SCREEN
-  );
-}
-
 function syncAssistantDock() {
-  if (assistantDock) assistantDock.setAvailable(assistantDockAvailable());
   if (commandPalette) commandPalette.setAvailable(gateMode === null);
 }
 
@@ -2194,20 +2168,6 @@ async function boot() {
   wireDelegatedClicks();
   wireGateControls();
   void paintSetupBadge();
-
-  // The dock is built before the first route so its availability is decided by
-  // the same loadScreen() pass that paints the screen behind it.
-  const dockRoot = document.getElementById("assistant-dock");
-  if (dockRoot) {
-    assistantDock = createAssistantDock({
-      ctx,
-      root: dockRoot,
-      // Carry the dock's durable conversation into S10 so "open full assistant"
-      // continues the thread instead of starting a new one.
-      onExpand: (screenId, conversationId) =>
-        go(conversationId ? screenId + "?c=" + encodeURIComponent(conversationId) : screenId),
-    });
-  }
 
   // The command palette. Built before the first route so the same loadScreen()
   // pass that paints the screen also decides whether the trigger is revealed.

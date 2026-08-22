@@ -105,7 +105,7 @@ const HALO_FRAME_CSS = [
 /** Brand row: the green mark and wordmark, same assets as the console. */
 const BRAND_ROW =
   `<div class="halo-brand">` +
-  `<img src="/console/assets/marks/halofy-mark-green.png" alt="" aria-hidden="true">` +
+  `<img src="/console/assets/marks/halofy-mark-green.svg" alt="" aria-hidden="true">` +
   `<b>Halofy</b></div>`;
 
 /**

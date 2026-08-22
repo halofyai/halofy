@@ -169,10 +169,10 @@ describe("mobile console navigation", () => {
     expect(html).toContain('id="app-rail"');
     expect(html).toContain('<title>Halofy</title>');
     expect(html).toContain('<div class="mobile-brand" aria-label="Halofy">');
-    expect(html).toContain('<img src="assets/marks/halofy-mark-green.png" alt="" aria-hidden="true" />');
+    expect(html).toContain('<img src="assets/marks/halofy-mark-green.svg" alt="" aria-hidden="true" />');
     expect(html).not.toContain('<span>Halofy</span>');
     expect(html).toContain('<aside class="rail" id="app-rail" aria-label="Halofy navigation">');
-    expect(html).toContain('<img class="mark" src="assets/marks/halofy-mark-white.png" alt="" aria-hidden="true" />');
+    expect(html).toContain('<img class="mark" src="assets/marks/halofy-mark-white.svg" alt="" aria-hidden="true" />');
     expect(html).not.toContain('<b>Halofy</b>');
     expect(html).not.toContain("HaloMem");
     expect(html).not.toContain("Halofy Halofy");

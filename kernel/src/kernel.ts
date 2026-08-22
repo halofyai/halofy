@@ -21,16 +21,16 @@
 import { ulid } from "ulid";
 import { access, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { assertSupportedDeployment, loadConfig, type KernelConfig } from "./config.js";
 import type {
   AccessSubject,
   ChannelAuthorityContext,
   ColdStoreDriver,
   Concept,
-  CreateSourceCredentialInput,
+  CopilotSourceSearchResult,
+  CopilotSourceSummary,
   ContextBlock,
-  CredentialMode,
   Embedder,
   GovernedSourceReadable,
   HumanRole,
@@ -40,7 +40,6 @@ import type {
   LlmClient,
   MemStats,
   Namespace,
-  PlatformConnectorId,
   PointerMatch,
   ScoredRef,
   SyscallContext,
@@ -49,8 +48,6 @@ import type {
   WriteResult,
   SetupInput,
   SetupResult,
-  SourceCredentialRecord,
-  SourceCredentialSummary,
   MountedRetrieverCapability,
   MemoryPin,
   MemoryObject,
@@ -135,12 +132,7 @@ import {
   type Scorecard,
   type ScorecardOptions,
 } from "./referee/index.js";
-import type {
-  AgentAccessLevel,
-  ExecutableChannelKind,
-  RawChannelRequest,
-  ScopedView,
-} from "./types.js";
+import type { AgentAccessLevel, ScopedView } from "./types.js";
 import {
   AuthService,
   AuthzError,
@@ -148,41 +140,6 @@ import {
   isSelfOrDescendant,
 } from "./auth/index.js";
 import { assertAgentKeyScope } from "./auth/agent-scope.js";
-import {
-  ChannelCredentialCipher,
-  createChannelCredentialCipher,
-  resolvedChannelSecretSet,
-} from "./channels/credentials/cipher.js";
-import { DbChannelCredentialService } from "./channels/credentials/service.js";
-import { DiscordGatewayWorker } from "./channels/discord-gateway.js";
-import { DiscordCartridge } from "./channels/providers/discord.js";
-import { ChannelIngressService, type ChannelIngressResult } from "./channels/ingress.js";
-import { ChannelLifecycleService } from "./channels/lifecycle.js";
-import {
-  ManagedGoogleChatService,
-  type ManagedGoogleChatConfig,
-} from "./channels/google-chat-managed.js";
-import type { ChannelCartridge } from "./channels/providers/cartridge.js";
-import { buildChannelCartridges } from "./channels/providers/index.js";
-import { deriveSlackAppRouteKey } from "./channels/providers/slack.js";
-import {
-  ChannelOAuthService,
-  type ChannelOAuthProvider,
-  type ChannelOAuthProviderConfig,
-} from "./channels/oauth.js";
-import { CHANNEL_SECRET_REQUIREMENTS } from "./channels/requirements.js";
-import {
-  createChannelDispatchRepository,
-  type ChannelDispatchRepository,
-} from "./channels/repository/dispatch.js";
-import { createChannelRepositories } from "./channels/repository/index.js";
-import {
-  ChannelRunner,
-  type ChannelCopilotExecutor,
-  type ChannelRunSummary,
-} from "./channels/runner.js";
-import { VerificationService as ChannelVerificationService } from "./channels/verification.js";
-import { parseExecutableChannelKind } from "./channels/catalog.js";
 import {
   BudgetGuard,
   DEFAULT_RATE_LIMIT_PER_MIN,
@@ -210,7 +167,6 @@ import {
   type WriteQueueStatus,
 } from "./resilience/index.js";
 import { DurableWriteQueue } from "./durable/write-queue.js";
-import { DurableTicketStore } from "./durable/tickets.js";
 import { DurableJobStore } from "./durable/jobs.js";
 import { DurableRateLimitStore } from "./durable/rate-limit.js";
 import { MetricsRegistry, createLogger, type Logger } from "./metrics/index.js";
@@ -219,7 +175,6 @@ import {
   memAssemble,
   memFault,
   memForget,
-  memLiveResult,
   memRead,
   memSearch,
   memStats,
@@ -229,14 +184,10 @@ import {
   planViaDriver,
   RateLimitError,
   sourceAccessSubject,
-  type L4DispatchOptions,
-  type L4DispatchOutcome,
   type MemAssembleArgs,
   type MemFaultArgs,
   type MemFaultResult,
   type MemForgetArgs,
-  type MemLiveResultArgs,
-  type MemLiveResultResult,
   type MemReadArgs,
   type MemReadResult,
   type MemSearchArgs,
@@ -254,25 +205,6 @@ import {
 } from "./usage/index.js";
 import { redactForOutbound } from "./skills/redact.js";
 
-// M6 federation (CONTRACTS-M6.md, D11–D15) — pointer catalog, credential
-// broker, L4 fault lane, and the usage-governed write-back cache. The
-// federation modules are structural; ALL binding to the store/audit/write
-// path happens here in the kernel.
-import {
-  matchPointers as catalogMatchPointers,
-  upsertPointers,
-  type PointerSearchHit,
-  type PointerSummary,
-} from "./federation/catalog.js";
-import { resolveCredential } from "./federation/credentials.js";
-import {
-  LIVE_TICKET_TTL_MS,
-  runL4,
-  type L4Connection,
-  type L4Deps,
-} from "./federation/lane.js";
-import { CacheKeeper, type CacheStore } from "./federation/cachekeeper.js";
-import { PostgresConnector, INTERNAL_TABLES, type QueryFn } from "./ingest/connectors/postgres.js";
 import { assertSecurePostgresDsn } from "./security/postgres.js";
 import {
   AgentConnectionGrantStore,
@@ -374,7 +306,6 @@ import { AgentSessionSummaryService } from "./agent-sessions/index.js";
 import {
   DbFragmentationReader,
   DbSourceState,
-  SourceCredentialRegistry,
   SourceRegistry,
   type SourceRow,
 } from "./ingest/kernel-store.js";
@@ -392,15 +323,9 @@ import {
   verifyObsidianIngress,
 } from "./ingest/obsidian.js";
 import { mapCsvToConnectorRecords, type CsvImportInput } from "./ingest/csv-import.js";
-import {
-  PLATFORM_CONNECTOR_CATALOG,
-  connectorCatalogEntry,
-  isPlatformConnectorId,
-} from "./ingest/connectors/catalog/index.js";
 
 function isStagedSourceKind(kind: SourceKind): boolean {
-  return kind === "obsidian_vault" ||
-    (isPlatformConnectorId(kind) && connectorCatalogEntry(kind).runtime.adapter !== "rest");
+  return kind === "obsidian_vault" || kind === "csv_sheet_import";
 }
 
 function obsidianCursorSequence(value: string | null): number {
@@ -431,16 +356,6 @@ function emptyObsidianSyncResult(sourceId: string): SyncResult {
     removed: [],
   };
 }
-import {
-  makeNangoHttpClient,
-  NangoProxyService,
-  NangoUnavailableError,
-  type NangoIntegrationBinding,
-} from "./ingest/nango.js";
-import {
-  NangoConnectAttemptStore,
-  nangoExternalConnectionHash,
-} from "./ingest/nango-store.js";
 
 // M5 control room — human sign-in (Module A) + the management-API read models
 // (Module B). Humans reuse the D9 Identity: a resolved session yields the SAME
@@ -586,29 +501,6 @@ import type { WarmStoreStatus } from "./types.js";
 import { setupChecklist, onboardingState, type OnboardingState, type SetupChecklist } from "./setup/checklist.js";
 import { adoptNamespaces, type AdoptReport } from "./tenancy/adopt.js";
 import { computeReadiness, type MemoryReadiness } from "./readiness/index.js";
-import {
-  userAnalytics as consoleUserAnalytics,
-  type UserAnalyticsParams,
-  type UserAnalyticsResult,
-} from "./console/rollups/user-analytics.js";
-import {
-  usageAiRollup as consoleUsageAiRollup,
-  usageAiTurnDetail as consoleUsageAiTurnDetail,
-  usageAiTurns as consoleUsageAiTurns,
-  usageQueries as consoleUsageQueries,
-  usageQueryTrace as consoleUsageQueryTrace,
-  usageRollup as consoleUsageRollup,
-  type AiRollupGroupBy,
-  type AiRollupResult,
-  type AiTurnDetailResult,
-  type AiTurnsParams,
-  type AiTurnsResult,
-  type UsageQueriesParams,
-  type UsageQueriesResult,
-  type UsageQueryTraceResult,
-  type UsageRollupParams,
-  type UsageRollupResult,
-} from "./console/rollups/usage-queries.js";
 import { buildGapFeed, type GapFeed } from "./console/rollups/gaps.js";
 import {
   suggestedQuestions as consoleSuggestedQuestions,
@@ -642,44 +534,15 @@ import {
   type OrgAutomation,
 } from "./automation/store.js";
 import { AutomationRunner, type AutomationRunSummary } from "./automation/runner.js";
+import { assistantActorHash } from "./erasure/actor-hash.js";
 import {
-  CopilotRoutineCipher,
-  CopilotRoutineRunner,
-  CopilotRoutineStore,
-  type CopilotRoutine,
-  type CopilotRoutineCreateInput,
-  type CopilotRoutineExecutor,
-  type CopilotRoutineRunSummary,
-  type CopilotRoutineUpdateInput,
-} from "./model-runtime/routines.js";
-import { assistantActorHash } from "./model-runtime/lifecycle.js";
-import type {
-  CopilotSourceSearchResult,
-  CopilotSourceSummary,
-} from "./model-runtime/types.js";
-import { CreditLedger, creditSummary, type CreditSummary } from "./billing/ledger.js";
-import { CreditExhaustedError, CreditMeter } from "./billing/meters.js";
-import { UsageEmitter } from "./billing/emitter.js";
-import {
-  EarlyAccessGuard,
-  EarlyAccessLimitError,
-  earlyAccessRateLimitPerMin,
-  type EarlyAccessConsumeItem,
-  type EarlyAccessFeature,
-  type EarlyAccessSummary,
-} from "./billing/early-access.js";
-import {
-  UsageCapService,
-  type SetCapInput,
-  type SetCapResult,
-  type UsageAlertConfigView,
-  type UsageSummary,
-} from "./policy/usage-caps.js";
-import {
-  UsageAlertEvaluator,
-  UsageAlertStore,
-  type UsageAlertUpsertInput,
-} from "./policy/usage-alerts.js";
+  QuotaLimitError,
+  UNMETERED,
+  type MeterPort,
+  type QuotaConsumeItem,
+  type QuotaFeature,
+  type QuotaPort,
+} from "./policy/quota.js";
 import {
   servePublicDiscovery,
   type PublicDiscoveryFormat,
@@ -722,34 +585,6 @@ import {
   type OAuthHttpResponse,
   type OAuthServerDeps,
 } from "./oauth/server.js";
-import {
-  GitHubAppService,
-  GitHubInstallationStore,
-  auditGitHubAllowlistChange,
-  makeGitHubAppHttpClient,
-  type GitHubInstallationSummary,
-} from "./ingest/github-app.js";
-import {
-  GitHubConnector,
-  GITHUB_SYNC_EVENTS,
-  githubSourceCoversRepo,
-  parseGitHubWebhookRepository,
-  verifyGitHubWebhookSignature,
-} from "./ingest/connectors/github.js";
-import { DocSiteConnector } from "./ingest/connectors/doc-site.js";
-import {
-  LinearDirectConnector,
-  linearIssueLiveQueryFromQuery,
-} from "./ingest/connectors/linear-direct.js";
-import { AirtableDirectConnector } from "./ingest/connectors/airtable-direct.js";
-import { notionPageIdFromQuery } from "./ingest/connectors/notion.js";
-import {
-  isGoogleWorkspaceDirectKind,
-  SourceOAuthError,
-  SourceOAuthService,
-  type SourceOAuthProvider,
-  type SourceOAuthProviderConfig,
-} from "./ingest/source-oauth.js";
 import {
   KnowledgeBaseNotFoundError,
   KnowledgeBaseStore,
@@ -1254,13 +1089,6 @@ export class Kernel {
   /** M3: register/get/list ingestion sources over the `sources` table. */
   readonly sources: SourceRegistry;
   private readonly sourceConfigCipher: SourceConfigCipher;
-  /** Direct provider OAuth for source connectors (Linear first). */
-  readonly sourceOAuth: SourceOAuthService;
-  /** Platform credentials are reusable by aliases but never returned decrypted. */
-  readonly sourceCredentials: SourceCredentialRegistry;
-  /** Server-owned Nango Connect + proxy boundary; keys never enter source records or HTTP. */
-  readonly nangoProxy: NangoProxyService;
-  readonly nangoAttempts: NangoConnectAttemptStore;
   /** M8: immutable badge-bound authority snapshots for governed agent access. */
   readonly gatewayGrants: AgentConnectionGrantStore;
   /** M8A: content-free access events, alerts, and exact temporary approvals. */
@@ -1315,47 +1143,10 @@ export class Kernel {
   readonly automations: OrgAutomationStore;
   /** M9 #19: durable `automation` job worker; null without a consolidation lane. */
   readonly automationRunner: AutomationRunner | null;
-  /** Actor-owned scheduled Copilot prompts and their durable worker. */
-  readonly copilotRoutines: CopilotRoutineStore;
-  readonly copilotRoutineRunner: CopilotRoutineRunner;
-  private copilotRoutineExecutor: CopilotRoutineExecutor | null = null;
-  /** C0 communication channels: control plane, ingress, and dispatch worker. */
-  readonly channels: {
-    repositories: ReturnType<typeof createChannelRepositories>;
-    dispatch: ChannelDispatchRepository;
-    credentials: DbChannelCredentialService;
-    lifecycle: ChannelLifecycleService;
-    verification: ChannelVerificationService;
-    ingress: ChannelIngressService;
-    oauth: ChannelOAuthService;
-    googleChatManaged: ManagedGoogleChatService;
-    cartridges: ReadonlyMap<ExecutableChannelKind, ChannelCartridge>;
-    /**
-     * Environment-derived readiness booleans per click-to-connect provider,
-     * so the console can say "not configured on this deployment" instead of
-     * failing silently. Booleans only — never the secrets themselves.
-     */
-    platformReadiness: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
-  };
-  private readonly channelRunner: ChannelRunner;
-  /** C2: long-lived Discord sockets; null unless the lane is enabled. */
-  private readonly discordGateway: DiscordGatewayWorker | null;
-  private channelCopilotExecutor: ChannelCopilotExecutor | null = null;
-  /** M9 #21: append-only credit balance/ledger over the one Postgres (E39). */
-  readonly creditLedger: CreditLedger;
-  /** M9 #21 (E40): syscall-layer entitlement gate — brownout, never hard-fail. */
-  readonly creditMeter: CreditMeter;
-  /** Invite-only pre-alpha allowance gate; inert unless HALOMEM_EARLY_ACCESS=true. */
-  readonly earlyAccess: EarlyAccessGuard;
-  /** M9 W3 (E54): post-commit delivery of ledger events to the billing program. */
-  readonly usageEmitter: UsageEmitter;
-  /** M9 W3 (E56): customer-editable monthly cap the entitlement gate reads. */
-  readonly usageCaps: UsageCapService;
-  /** M9 W3 (E53): customer-editable alert thresholds + daily-close evaluator. */
-  readonly usageAlerts: UsageAlertStore;
-  readonly usageAlertEvaluator: UsageAlertEvaluator;
-  /** M9 #1 (E1–E3): GitHub App install/approve/revoke brokerage. */
-  readonly githubApp: GitHubAppService;
+  /** Optional packaging boundary. Standalone Halofy is unmetered by default. */
+  readonly quota: QuotaPort;
+  /** Optional commercial accounting; absent in the standalone build. */
+  readonly meter: MeterPort | undefined;
   /** M9 #11b (D29/E23–E27): hosted OAuth AS — approved clients, sha256 tokens. */
   readonly oauthClients: OAuthClientService;
   readonly oauthTokens: OAuthTokenService;
@@ -1367,22 +1158,12 @@ export class Kernel {
   private readonly seedDefaultSkills: (namespace: Namespace) => Promise<void>;
   readonly skillVetting: SkillVetting;
   readonly skillUsage: SkillUsageService;
-  /** M6 (D15): in-memory phase-2 tickets, 120s TTL. */
-  readonly durableTickets: DurableTicketStore;
-  /** M6 (D14): the write-back cache store + its interval sweeper. */
-  readonly cacheStore: CacheStore;
-  readonly cacheKeeper: CacheKeeper;
-  /** M6: ticket → minting namespace, the cross-tenant redemption fence. */
-  private readonly liveSourceTokens = new Map<string, Record<string, string>>();
-  private readonly liveWorkerId = `live-worker:${process.pid}:${ulid()}`;
-  private liveWorker: Promise<void> | null = null;
   private conflictScanWorker: Promise<{ claimed: number; completed: number; failed: number }> | null = null;
   private conflictAutopilotWorker: Promise<ConflictAutopilotRunResult> | null = null;
   private entityTagWorker: Promise<EntityTagRunResult> | null = null;
   private companyFileWorker: Promise<{ claimed: number; completed: number }> | null = null;
   private companyFileWorkerWake = false;
   private relationshipEnrichmentWorker: Promise<{ claimed: number; completed: number }> | null = null;
-  private readonly liveJobPoller: NodeJS.Timeout;
   private readonly connectorJobPoller: NodeJS.Timeout;
   private readonly conflictScanJobPoller: NodeJS.Timeout;
   private readonly conflictAutopilotPoller: NodeJS.Timeout;
@@ -1394,13 +1175,6 @@ export class Kernel {
   private memoryTitleWorker: Promise<MemoryTitleRunResult> | null = null;
   /** Stops the convergence log once there is nothing left to repair. */
   private embeddingBackfillIdle = false;
-  /**
-   * M6 test/demo seam: injected live connectors per source id (functions can
-   * never ride in the sealed source config, so fixture query surfaces are
-   * registered in-process). Production falls back to buildLiveConnector.
-   */
-  private readonly liveConnectors = new Map<string, unknown>();
-
   private readonly runtimes = new Map<Namespace, KernelNamespaceRuntime>();
   private readonly deps: SyscallDeps;
   /** Read-only, ACL-scoped entity listing for ScopedViews (kernel-side SQL). */
@@ -1417,6 +1191,8 @@ export class Kernel {
     llm: LlmClient;
     signingKey: SigningKey;
     vettingV2: { mode: VettingV2Mode; lanes: SkillVettingLanes };
+    quota?: QuotaPort;
+    meter?: MeterPort;
   }) {
     this.config = parts.config;
     this.db = parts.db;
@@ -1459,7 +1235,6 @@ export class Kernel {
       this.sourceConfigCipher,
       (db, event) => this.audit.appendTo(db, event),
     );
-    this.sourceCredentials = new SourceCredentialRegistry(this.db, this.sourceConfigCipher);
     // M9 #23: typed key labels + audited create/rotate/revoke over api_keys.
     this.productKeys = new ProductKeyService(
       this.db,
@@ -1505,100 +1280,11 @@ export class Kernel {
     this.skillUsage = new SkillUsageService({ db: this.db });
     // M9 #18 (D31): governance rows in the one Postgres, same-tx audit.
     this.feedback = new AnswerOutcomeService({ db: this.db, audit: this.audit });
-    // M9 #21: credit ledger + the composed entitlement gate (BudgetGuard lane
-    // included so one gate covers monthly-USD brownout AND credit exhaustion).
-    // E54: the emitter delivers committed ledger events to the EXTERNAL billing
-    // program post-commit, fire-and-forget — the kernel ledger stays an
-    // enforcement cache, never the billing source of truth. Unconfigured
-    // (HALO_BILLING_ENDPOINT unset) → brownout, never blocks a debit.
-    this.usageEmitter = new UsageEmitter(new DurableJobStore(this.db), {
-      logger: this.logger,
-    });
-    this.creditLedger = new CreditLedger(this.db, this.audit, {
-      emitter: this.usageEmitter,
-    });
-    this.creditMeter = new CreditMeter(this.creditLedger, {
-      budget: this.budget,
-      logger: this.logger,
-    });
-    this.earlyAccess = new EarlyAccessGuard(this.db);
-    // M9 W3 (E56/E53): customer-editable cap (policies.monthlyBudgetUsd — the
-    // exact field the entitlement gate reads) + alert thresholds/evaluator.
-    this.usageCaps = new UsageCapService(this.db, this.policyStore, this.budget, this.audit);
-    this.usageAlerts = new UsageAlertStore(this.db, this.audit);
-    this.usageAlertEvaluator = new UsageAlertEvaluator({
-      db: this.db,
-      audit: this.audit,
-      policyStore: this.policyStore,
-      budget: this.budget,
-    });
+    this.quota = parts.quota ?? UNMETERED;
+    this.meter = parts.meter;
     // M9 #19 (D30): org automation store; the runner is wired after the
     // consolidation lane exists (it is the ONLY way templates emit knowledge).
     this.automations = new OrgAutomationStore(this.db, this.audit);
-    // M9 #1: GitHub App brokerage — sealed rows share the source-credential
-    // cipher; summaries never carry installation ids or tokens (E2).
-    this.githubApp = new GitHubAppService({
-      appId: process.env.HALOMEM_GITHUB_APP_ID,
-      privateKeyPem: process.env.HALOMEM_GITHUB_APP_PRIVATE_KEY,
-      appSlug: process.env.HALOMEM_GITHUB_APP_SLUG,
-      client: makeGitHubAppHttpClient(),
-      store: new GitHubInstallationStore(this.db, this.sourceConfigCipher),
-      appendAudit: (event) => this.audit.append(event),
-      log: (message) => this.logger.warn(message),
-    });
-    const nangoIntegrations: Record<string, NangoIntegrationBinding> = {};
-    for (const entry of PLATFORM_CONNECTOR_CATALOG) {
-      const integrationId = this.config.nangoIntegrations[entry.connectionKey];
-      if (integrationId) {
-        nangoIntegrations[entry.id] = {
-          integrationId,
-          connectionKey: entry.connectionKey,
-        };
-      }
-    }
-    this.nangoAttempts = new NangoConnectAttemptStore(this.db, {
-      connectionLimit: this.config.nangoConnectionLimit,
-      attemptTtlMs: 30 * 60 * 1_000,
-      now: () => new Date(),
-      makeAttemptId: () => ulid(),
-    });
-    const environmentKey = this.config.nangoEnvironmentId;
-    this.nangoProxy = new NangoProxyService({
-      connectApiKey: this.config.nangoConnectApiKey,
-      proxyApiKey: this.config.nangoProxyApiKey,
-      connectionLimit: this.config.nangoConnectionLimit,
-      integrations: nangoIntegrations,
-      makeAttemptId: () => ulid(),
-      makeOrganizationTag: (organizationId) => createHmac(
-        "sha256",
-        this.config.nangoConnectApiKey || "halomem-unconfigured-nango",
-      ).update(organizationId).digest("hex"),
-      client: makeNangoHttpClient(this.config.nangoFetch),
-      attemptStore: this.nangoAttempts,
-      environmentKey,
-      bindConnection: async (input) => {
-        const externalRef = nangoExternalConnectionHash({
-          environmentKey,
-          providerConfigKey: input.integrationId,
-          connectionId: input.connectionId,
-        });
-        return this.sourceCredentials.createManaged(input.organizationId, {
-          connectorId: input.connectorId,
-          connectionKey: input.connectionKey,
-          name: input.name,
-          config: {
-            nangoIntegrationId: input.integrationId,
-            nangoConnectionId: input.connectionId,
-          },
-        }, externalRef);
-      },
-      getBoundCredential: async (id) => {
-        const record = await this.sourceCredentials.get(id);
-        if (!record) return null;
-        const { config: _config, ...summary } = record;
-        return summary;
-      },
-    });
     this.policyDocuments = new PolicyDocumentStore(this.db);
     this.policyCompliance = new PolicyComplianceStore(this.db);
     this.knowledgeBases = new KnowledgeBaseStore(this.db);
@@ -1619,35 +1305,6 @@ export class Kernel {
     // take the { users, sessions } bundle below.
     this.users = new UserStore(this.db);
     this.sessions = new SessionStore(this.db);
-    this.copilotRoutines = new CopilotRoutineStore(
-      this.db,
-      new CopilotRoutineCipher(
-        this.config.modelCredentialKek,
-        !this.config.databaseUrl && !this.config.pgliteDataDir,
-      ),
-      this.audit,
-    );
-    this.copilotRoutineRunner = new CopilotRoutineRunner({
-      db: this.db,
-      store: this.copilotRoutines,
-      audit: this.audit,
-      resolveIdentity: async (namespace, actor) => {
-        const user = await this.users.byEmail(actor);
-        if (!user || user.status !== "active" || user.namespace !== namespace) return null;
-        return {
-          keyId: `copilot-routine-user:${user.id}`,
-          namespace: user.namespace,
-          actor: user.email,
-          role: user.role,
-        };
-      },
-      execute: async (input) => {
-        if (!this.copilotRoutineExecutor) {
-          throw new Error("Copilot routine execution is unavailable");
-        }
-        return this.copilotRoutineExecutor(input);
-      },
-    });
     this.bootstrapService = new BootstrapService(this.db, this.config.bootstrapToken);
     this.invitations = new InvitationStore(this.db);
     // M10: one grant store over the one database (D5); every mutation audits
@@ -1736,24 +1393,7 @@ export class Kernel {
           audit: this.audit,
           store: this.automations,
           proposer: this.consolidation,
-          // E40 (#21): every occurrence debits one automation_run; an empty
-          // balance degrades the occurrence (audited) instead of running free.
-          meter: this.creditMeter,
-          earlyAccess: async (identity, idempotencyKey) => {
-            try {
-              await this.consumeEarlyAccess(
-                identity,
-                "automation",
-                "automation_run",
-                "automation",
-                { idempotencyKey },
-              );
-              return true;
-            } catch (error) {
-              if (error instanceof EarlyAccessLimitError) return false;
-              throw error;
-            }
-          },
+          ...(this.meter === undefined ? {} : { meter: this.meter }),
         })
       : null;
     this.disputes = new DisputeService({
@@ -1976,19 +1616,6 @@ export class Kernel {
       seedDefaultSkills: this.seedDefaultSkills,
     });
 
-    // M6 (D14/D15): federation plumbing. The ticket store is process-local
-    // (like the WriteQueue); the cache keeper sweeps write-back-cached facts
-    // to status='archived' (never a delete — D7) on a minutes cadence.
-    this.durableTickets = new DurableTicketStore(this.db);
-    this.cacheStore = this.buildCacheStore();
-    const sweepSecondsRaw = Number(process.env.HALOMEM_CACHE_SWEEP_SECONDS ?? "");
-    this.cacheKeeper = new CacheKeeper(this.cacheStore, {
-      ...(Number.isFinite(sweepSecondsRaw) && sweepSecondsRaw > 0
-        ? { intervalSeconds: sweepSecondsRaw }
-        : {}),
-      log: (msg) => this.logger.info(msg),
-    });
-
     this.deps = {
       config: this.config,
       db: this.db,
@@ -1999,6 +1626,7 @@ export class Kernel {
       rateLimiter: this.rateLimiter,
       budget: this.budget,
       logger: this.logger,
+      quotaRateLimit: (current, actor) => this.quota.rateLimitPerMin(current, actor),
       isCredentialActive: (identity) => this.isIdentityActive(identity),
       getPolicy: (namespace) => this.policyStore.getFresh(namespace),
       resolveTenant: (namespace) => this.tenants.resolveTenant(namespace),
@@ -2054,14 +1682,6 @@ export class Kernel {
       afterForgetCommit: async (erasedIds, namespace) => {
         this.l1Cache.eraseNamespace(l1CachePartition(namespace));
         return this.warm.afterForget(erasedIds, namespace);
-      },
-      // M6 (D15): the L4 federated lane behind mem_fault's phase-2 seam. The
-      // lane audits every dispatch itself (D4) and never serializes
-      // opts.sourceTokens; tickets are namespace-fenced like writeStatus.
-      l4: {
-        dispatch: (query, opts) => this.l4Dispatch(query, opts),
-        result: (ticket, identity, sourceTokens) =>
-          this.l4Result(ticket, identity, sourceTokens),
       },
     };
 
@@ -2147,381 +1767,15 @@ export class Kernel {
         }
       },
     );
-    this.connectorRegistry = makeBuiltinConnectorRegistry(
-      this.nangoProxy,
-      this.config.notionFetch,
-      this.config.googleDriveFetch,
-    );
-    // M9 #1/#2: the two new EnterpriseConnector cartridges (sink-only, D10).
-    this.connectorRegistry.register(new GitHubConnector());
-    this.connectorRegistry.register(new DocSiteConnector());
-    // Direct Linear workspace OAuth connector (no Nango) — sink-only, D10.
-    this.connectorRegistry.register(new LinearDirectConnector());
-    // Direct Airtable OAuth connector (no Nango) — sink-only, D10.
-    this.connectorRegistry.register(new AirtableDirectConnector(this.config.airtableFetch));
-    // C0 channels: the control plane and worker are always constructed; with
-    // no channel KEK configured every credential operation fails closed as
-    // `unavailable` and no route resolves, so an unconfigured kernel is inert.
-    const channelRepositories = createChannelRepositories(this.db);
-    const channelDispatchRepository = createChannelDispatchRepository(this.db);
-    let channelCipher: ChannelCredentialCipher;
-    try {
-      channelCipher = createChannelCredentialCipher(this.config);
-    } catch {
-      // No channel KEK on a persistent deployment: boot anyway with an
-      // unavailable cipher so every credential operation browns out as
-      // `unavailable` instead of taking the whole kernel down.
-      channelCipher = new ChannelCredentialCipher("", {
-        environment: this.config.channelEnvironment,
-        kekId: this.config.channelSecretKekId || "unconfigured",
-        keyVersion: Math.max(1, this.config.channelSecretKeyVersion),
-      });
-    }
-    const managedGoogleChatConfig: ManagedGoogleChatConfig | null =
-      this.config.channelsEnabled && this.config.channelOutboundEnabled &&
-      this.config.channelGoogleChatProjectNumber.length > 0
-        ? {
-            projectNumber: this.config.channelGoogleChatProjectNumber,
-            installUrl: this.config.channelGoogleChatInstallUrl,
-            routeKey: this.config.channelGoogleChatRouteKey,
-            outboundCredential: this.config.channelGoogleChatServiceAccountJson || JSON.stringify({
-              type: "azure_wif",
-              azure_client_id: this.config.channelGoogleChatAzureClientId,
-              azure_app_id_uri: this.config.channelGoogleChatAzureAppIdUri,
-              workload_identity_provider:
-                this.config.channelGoogleChatWorkloadIdentityProvider,
-              service_account_email: this.config.channelGoogleChatServiceAccountEmail,
-              identity_endpoint: this.config.channelGoogleChatAzureIdentityEndpoint,
-              identity_header: this.config.channelGoogleChatAzureIdentityHeader,
-            }),
-          }
-        : null;
-    const channelCredentials = new DbChannelCredentialService(
-      this.db,
-      channelCipher,
-      {
-        requiredSecretTypes: CHANNEL_SECRET_REQUIREMENTS,
-        managedConnectionReady: (connection) => managedGoogleChatConfig !== null &&
-          connection.kind === "google_chat" &&
-          connection.displayMetadata.installationMode === "managed",
-      },
-    );
-    const channelVerification = new ChannelVerificationService({
-      db: this.db,
-      connections: channelRepositories.connections,
-      events: channelRepositories.events,
-      runtime: channelRepositories.runtime,
-      audit: this.audit,
-      deploymentConfigVersion: this.config.channelDeploymentVersion || "dev",
-      infrastructureVersion: this.config.channelInfrastructureVersion || "dev",
-    });
-    const channelLifecycle = new ChannelLifecycleService({
-      db: this.db,
-      connections: channelRepositories.connections,
-      events: channelRepositories.events,
-      runtime: channelRepositories.runtime,
-      audit: this.audit,
-      verification: channelVerification,
-      credentialReadiness: channelCredentials,
-      resolveActiveIdentity: (keyId) => this.auth.resolveActiveIdentity(keyId),
-    });
-    const managedGoogleChat = new ManagedGoogleChatService({
-      db: this.db,
-      connections: channelRepositories.connections,
-      lifecycle: channelLifecycle,
-      audit: this.audit,
-      config: managedGoogleChatConfig,
-    });
-    const channelCartridgeList = buildChannelCartridges(
-      process.env,
-      this.config.channelFetch ? { fetch: this.config.channelFetch } : {},
-    );
-    const channelCartridges = new Map<ExecutableChannelKind, ChannelCartridge>(
-      channelCartridgeList.map((cartridge) => [cartridge.kind, cartridge]),
-    );
-    // A Slack app delivers every workspace's events to ONE request URL, so
-    // the deployment exposes one app-scoped route derived from the signing
-    // secret (see deriveSlackAppRouteKey) instead of per-connection keys.
-    const channelAppRouteKeys = new Map<ExecutableChannelKind, string>();
-    if (process.env.HALOMEM_SLACK_SIGNING_SECRET) {
-      channelAppRouteKeys.set(
-        "slack",
-        deriveSlackAppRouteKey(process.env.HALOMEM_SLACK_SIGNING_SECRET),
-      );
-    }
-    if (managedGoogleChatConfig !== null) {
-      channelAppRouteKeys.set("google_chat", managedGoogleChatConfig.routeKey);
-    }
-    const channelIngress = new ChannelIngressService({
-      db: this.db,
-      connections: channelRepositories.connections,
-      events: channelRepositories.events,
-      dispatch: channelDispatchRepository,
-      credentials: channelCredentials,
-      audit: this.audit,
-      cartridges: channelCartridges,
-      receiptLeaseMs: this.config.channelReceiptLeaseMs,
-      workerId: `channel-ingress:${process.pid}`,
-      appRouteKeys: channelAppRouteKeys,
-      resolveAppScopedBinding: (kind, claims) => kind === "google_chat"
-        ? managedGoogleChat.bindVerifiedClaims(claims)
-        : Promise.resolve(null),
-    });
-    const channelOAuthProviders: Partial<Record<ChannelOAuthProvider, ChannelOAuthProviderConfig>> = {};
-    const oauthEnv: Record<ChannelOAuthProvider, [string | undefined, string | undefined]> = {
-      slack: [process.env.HALOMEM_SLACK_CLIENT_ID, process.env.HALOMEM_SLACK_CLIENT_SECRET],
-      gmail: [process.env.HALOMEM_GOOGLE_CLIENT_ID, process.env.HALOMEM_GOOGLE_CLIENT_SECRET],
-      outlook: [process.env.HALOMEM_MS_CLIENT_ID, process.env.HALOMEM_MS_CLIENT_SECRET],
-    };
-    for (const [provider, [clientId, clientSecret]] of
-      Object.entries(oauthEnv) as [ChannelOAuthProvider, [string | undefined, string | undefined]][]) {
-      if (clientId && clientSecret) {
-        channelOAuthProviders[provider] = { clientId, clientSecret };
-      }
-    }
-    const channelOAuth = new ChannelOAuthService({
-      db: this.db,
-      connections: channelRepositories.connections,
-      credentials: channelCredentials,
-      cipher: channelCipher,
-      audit: this.audit,
-      environment: this.config.channelEnvironment,
-      publicUrl: this.config.channelPublicUrl,
-      providers: channelOAuthProviders,
-      ...(this.config.channelFetch ? { fetch: this.config.channelFetch } : {}),
-    });
-    // Direct source-connector OAuth. The callback creates the
-    // source under the initiating admin identity through connectSource, so
-    // conformance, ACL gating, sealing, and the initial sync job all apply.
-    const sourceOAuthProviders: Partial<Record<SourceOAuthProvider, SourceOAuthProviderConfig>> = {};
-    if (this.config.airtableClientId && this.config.airtableClientSecret) {
-      sourceOAuthProviders.airtable = {
-        clientId: this.config.airtableClientId,
-        clientSecret: this.config.airtableClientSecret,
-        ...(this.config.airtableFetch ? { fetch: this.config.airtableFetch } : {}),
-      };
-    }
-    if (process.env.HALOMEM_LINEAR_CLIENT_ID && process.env.HALOMEM_LINEAR_CLIENT_SECRET) {
-      sourceOAuthProviders.linear = {
-        clientId: process.env.HALOMEM_LINEAR_CLIENT_ID,
-        clientSecret: process.env.HALOMEM_LINEAR_CLIENT_SECRET,
-      };
-    }
-    if (this.config.notionClientId && this.config.notionClientSecret) {
-      sourceOAuthProviders.notion = {
-        clientId: this.config.notionClientId,
-        clientSecret: this.config.notionClientSecret,
-        ...(this.config.notionFetch ? { fetch: this.config.notionFetch } : {}),
-      };
-    }
-    if (this.config.googleDriveClientId && this.config.googleDriveClientSecret) {
-      sourceOAuthProviders.google_drive = {
-        clientId: this.config.googleDriveClientId,
-        clientSecret: this.config.googleDriveClientSecret,
-        ...(this.config.googleDriveFetch ? { fetch: this.config.googleDriveFetch } : {}),
-      };
-    }
-    this.sourceOAuth = new SourceOAuthService({
-      db: this.db,
-      appendAudit: (event) => this.audit.append(event),
-      appendAuditTo: (db, event) => this.audit.appendTo(db as Db, event),
-      resolveActiveIdentity: async (keyId) =>
-        (await this.auth.resolveActiveAdministrativeIdentity(keyId)) ??
-        this.sessions.resolveActiveIdentity(keyId),
-      validateTargetTeam: async (targetTeamId, identity) => {
-        await this.resolveBackendSourceNamespace(targetTeamId, identity);
-      },
-      publicUrl: this.config.channelPublicUrl,
-      providers: sourceOAuthProviders,
-      createSource: async (kind, config, identity, options) => {
-        let namespace: Namespace;
-        try {
-          namespace = await this.resolveBackendSourceNamespace(options.targetTeamId, identity);
-        } catch {
-          throw new SourceOAuthError("oauth-denied", "the selected team is unavailable");
-        }
-        const connector = this.connectorRegistry.require(kind);
-        const resolvedConfig = await this.sourceConnectorConfig(kind, config, namespace);
-        if (!connector.capabilities().sourceAcl &&
-            resolvedConfig.sourceAccessMode !== "namespace-open") {
-          throw new Error(
-            `connector '${kind}' cannot prove source ACLs; set sourceAccessMode='namespace-open' ` +
-            "only after approving namespace-wide visibility",
-          );
-        }
-        await validateConnectorConformance(connector, resolvedConfig);
-        const existingSource = options.idempotencyKey
-          ? await this.sources.getByIdempotencyKey(namespace, options.idempotencyKey)
-          : null;
-        if (existingSource === null) {
-          await this.consumeEarlyAccess(identity, "source", "write", "source-oauth-register", {
-            idempotencyKey: options.idempotencyKey ?? `source-oauth-register:${ulid()}`,
-          });
-        }
-        const now = new Date().toISOString();
-        return this.db.transaction(async (tx) => {
-          const sources = new SourceRegistry(
-            tx,
-            this.sourceConfigCipher,
-            (db, event) => this.audit.appendTo(db, event),
-          );
-          let source = options.idempotencyKey
-            ? await sources.getByIdempotencyKey(namespace, options.idempotencyKey)
-            : null;
-          if (source && source.kind !== kind) {
-            throw new Error("source idempotency key is already bound to another connector");
-          }
-          if (!source) {
-            source = await sources.register(
-              namespace,
-              kind,
-              config,
-              options.idempotencyKey ?? undefined,
-            );
-          } else {
-            // Re-authorization rotates the sealed grant on the same source.
-            await sources.patchConfig(source.id, config);
-          }
-          if (options.intervalSeconds !== null) {
-            await sources.setSchedule(source.id, options.intervalSeconds);
-          }
-          const active = await tx.query(
-            `UPDATE durable_jobs
-                SET available_at = CASE WHEN state = 'queued' THEN $3 ELSE available_at END,
-                    updated_at = $3
-              WHERE id = (
-                SELECT id FROM durable_jobs
-                 WHERE kind = 'source-sync' AND namespace = $2
-                   AND payload->>'sourceId' = $1 AND state IN ('queued', 'running')
-                 ORDER BY CASE WHEN state = 'running' THEN 0 ELSE 1 END,
-                          available_at, created_at
-                 LIMIT 1
-              )
-              RETURNING id`,
-            [source.id, source.namespace, now],
-          );
-          if (active.rows.length === 0) {
-            await new DurableJobStore(tx).enqueue({
-              id: `source-sync:${source.id}:${ulid()}`,
-              kind: "source-sync",
-              namespace: source.namespace,
-              payload: { sourceId: source.id },
-              availableAt: now,
-            });
-          }
-          await this.audit.appendTo(tx, {
-            ts: now,
-            actor: "source-oauth",
-            agentId: "source-oauth",
-            op: "write",
-            memoryId: null,
-            namespace: source.namespace,
-            purpose: "source-oauth",
-            result: "ok",
-            detail: JSON.stringify({
-              event: "source.oauth",
-              action: "callback",
-              provider: kind === "notion_direct" ? "notion"
-                : isGoogleWorkspaceDirectKind(kind) ? "google_drive"
-                  : kind === "airtable_direct" ? "airtable" : "linear",
-              sourceId: source.id,
-            }),
-          });
-          return (await sources.getRedacted(source.id)) ?? source;
-        });
-      },
-      mutateSourceConfig: (sourceId, mutate) =>
-        this.sources.mutateConfigLocked(sourceId, mutate),
-      ...(this.config.channelFetch ? { fetch: this.config.channelFetch } : {}),
-    });
-    this.channels = {
-      repositories: channelRepositories,
-      dispatch: channelDispatchRepository,
-      credentials: channelCredentials,
-      lifecycle: channelLifecycle,
-      verification: channelVerification,
-      ingress: channelIngress,
-      oauth: channelOAuth,
-      googleChatManaged: managedGoogleChat,
-      cartridges: channelCartridges,
-      platformReadiness: {
-        slack: {
-          oauth: channelOAuthProviders.slack !== undefined &&
-            this.config.channelPublicUrl !== "",
-          events: channelAppRouteKeys.has("slack"),
-        },
-        google_chat: {
-          managed: managedGoogleChat.configured,
-          events: channelAppRouteKeys.has("google_chat"),
-        },
-      },
-    };
-    this.channelRunner = new ChannelRunner({
-      db: this.db,
-      jobs: new DurableJobStore(this.db),
-      connections: channelRepositories.connections,
-      events: channelRepositories.events,
-      dispatch: channelDispatchRepository,
-      credentials: channelCredentials,
-      audit: this.audit,
-      cartridges: channelCartridges,
-      resolveActiveIdentity: (keyId) => this.auth.resolveChannelIdentity(keyId),
-      resolveVerificationIdentity: (keyId) => this.auth.resolveVerificationIdentity(keyId),
-      execute: (input) => {
-        if (!this.channelCopilotExecutor) {
-          throw new Error("channel copilot execution is unavailable");
-        }
-        return this.channelCopilotExecutor(input);
-      },
-      outboundEnabled: () => this.config.channelOutboundEnabled,
-      resolveManagedSecrets: (connection, secretTypes) => {
-        if (managedGoogleChatConfig === null || connection.kind !== "google_chat" ||
-            connection.displayMetadata.installationMode !== "managed" ||
-            secretTypes.length !== 1 || secretTypes[0] !== "service-token") {
-          return null;
-        }
-        return resolvedChannelSecretSet(0, new Map([
-          ["service-token", Buffer.from(managedGoogleChatConfig.outboundCredential, "utf8")],
-        ]));
-      },
-      ...(this.config.channelFetch ? { fetch: this.config.channelFetch } : {}),
-      leaseMs: this.config.channelLeaseMs,
-    });
-    // C2: Discord delivers ordinary channel messages over a gateway socket, not
-    // to the interactions endpoint. Opt-in — one process should own the
-    // sockets — and inert when no Discord connection is active.
-    const discordCartridge = channelCartridges.get("discord");
-    this.discordGateway = this.config.channelDiscordGatewayEnabled &&
-        discordCartridge instanceof DiscordCartridge
-      ? new DiscordGatewayWorker({
-          connections: channelRepositories.connections,
-          credentials: channelCredentials,
-          ingress: channelIngress,
-          cartridge: discordCartridge,
-          audit: this.audit,
-        })
-      : null;
-    this.liveJobPoller = setInterval(() => void this.kickLiveJobs(), 1_000);
-    this.liveJobPoller.unref?.();
-    void this.kickLiveJobs();
+    this.connectorRegistry = makeBuiltinConnectorRegistry();
     this.connectorJobPoller = setInterval(
       () => {
         void this.runConnectorJobsOnce().catch(() => undefined);
         // M9 #19 (E36): the automation recurrence is a durable poll-and-claim
         // pass on the same cadence — never a per-automation timer.
         void this.runAutomationJobsOnce().catch(() => undefined);
-        void this.runCopilotRoutineJobsOnce().catch(() => undefined);
-        // M9 W3 (E53/E54): usage-close daily pass + billing-event delivery ride
-        // the same durable poll — cheap no-ops when nothing is due.
-        void this.usageAlertEvaluator.runUsageCloseOnce().catch(() => undefined);
-        void this.usageEmitter.runUsageEmitJobsOnce().catch(() => undefined);
-        // C0 channels: dispatch + outbound delivery on the same durable poll.
-        void this.runChannelJobsOnce().catch(() => undefined);
         void this.runCompanyFileUploadJobsOnce().catch(() => undefined);
         void this.runRelationshipEnrichmentJobsOnce().catch(() => undefined);
-        // C2 channels: reconcile Discord gateway sockets with the connections
-        // that should have one (no-op when the lane is disabled).
-        void this.discordGateway?.syncOnce().catch(() => undefined);
       },
       5_000,
     );
@@ -2571,12 +1825,8 @@ export class Kernel {
     void this.runConnectorJobsOnce().catch(() => undefined);
     void this.runEmbeddingBackfillOnce().catch(() => undefined);
     void this.runAutomationJobsOnce().catch(() => undefined);
-    void this.runCopilotRoutineJobsOnce().catch(() => undefined);
     void this.runCompanyFileUploadJobsOnce().catch(() => undefined);
     void this.runRelationshipEnrichmentJobsOnce().catch(() => undefined);
-    // E53: arm the daily-close chain at boot (idempotent; deterministic job id).
-    void this.usageAlertEvaluator.ensureArmed().catch(() => undefined);
-    void this.usageEmitter.runUsageEmitJobsOnce().catch(() => undefined);
   }
 
   /** Best-effort audit row for a failed/denied queued write (never masks the error). */
@@ -2666,13 +1916,6 @@ export class Kernel {
     } catch (err) {
       await db.close();
       throw err;
-    }
-    // M6 (D14): start the cache sweeper (interval from
-    // HALOMEM_CACHE_SWEEP_SECONDS, default 900s). Skipped under test runners —
-    // hermetic tests drive sweeps explicitly with a fake clock; the timer is
-    // unref()'d so it never pins a short-lived process either way.
-    if (process.env.NODE_ENV !== "test" && process.env.VITEST === undefined) {
-      kernel.cacheKeeper.start();
     }
     return kernel;
   }
@@ -3295,7 +2538,7 @@ export class Kernel {
       const fileIdempotencyKey = input.idempotencyKey === undefined
         ? `company-file:sha:${requestSha256}`
         : `company-file:client:${input.idempotencyKey}`;
-      await this.consumeEarlyAccessMany(identity, [
+      await this.consumeQuotaMany(identity, [
         { feature: "file_bytes", units: Math.max(1, bytes.byteLength) },
         { feature: "file" },
       ], "write", "company-file-upload", { idempotencyKey: fileIdempotencyKey });
@@ -3826,9 +3069,9 @@ export class Kernel {
             contentSha256,
             createdBy: identity.actor,
             uploadedBy: identity.actor,
-          }, this.earlyAccess.isEnabled() ? {
-            maxFiles: await this.earlyAccess.tenantCeiling(base.namespace, "file"),
-            maxBytes: await this.earlyAccess.tenantCeiling(base.namespace, "file_bytes"),
+          }, this.quota.isEnabled() ? {
+            maxFiles: await this.quota.tenantCeiling(base.namespace, "file"),
+            maxBytes: await this.quota.tenantCeiling(base.namespace, "file_bytes"),
           } : {});
           file = reservation.file;
         }
@@ -4595,7 +3838,7 @@ export class Kernel {
     policyOverrides: Partial<PolicyConfigX> = {},
     relationshipImpact?: IngestRelationshipImpact,
     hooks?: WritePathHooks,
-    earlyAccessOptions: { enrollSeat?: boolean } = {},
+    quotaOptions: { enrollSeat?: boolean } = {},
   ): Promise<(req: WriteRequest) => Promise<WriteResult>> {
     // Ingestion is a write — the auditor role may not write memory (parity
     // with mem_write's role gate). Denied BEFORE any source I/O runs.
@@ -4620,10 +3863,10 @@ export class Kernel {
         documentKey: req.provenance?.documentKey ?? null,
         contentHash,
       })).digest("hex");
-      await this.consumeEarlyAccess(identity, "ingest_bytes", "write", "ingest-bytes", {
+      await this.consumeQuota(identity, "ingest_bytes", "write", "ingest-bytes", {
         idempotencyKey: `ingest:${meteringKey}`,
         units: Math.max(1, Buffer.byteLength(req.content, "utf8")),
-        enrollSeat: earlyAccessOptions.enrollSeat ?? identity.role !== "agent",
+        enrollSeat: quotaOptions.enrollSeat ?? identity.role !== "agent",
       });
       // Cost attribution: every LLM/embed call this write makes (extraction,
       // verification, entity resolution) stamps its ledger rows with the
@@ -4811,7 +4054,7 @@ export class Kernel {
       );
     }
     const records: IngestRecord[] = importer.parse(raw);
-    await this.consumeEarlyAccess(identity, "source", "write", "source-import", {
+    await this.consumeQuota(identity, "source", "write", "source-import", {
       idempotencyKey: `source-import:${kind}:${ulid()}`,
     });
     const impact = relationshipImpact();
@@ -4836,122 +4079,6 @@ export class Kernel {
     await this.sources.touchLastSync(source.id, new Date().toISOString());
     await this.finalizeRelationshipImpact(identity, impact, true);
     return result;
-  }
-
-  async createSourceCredential(
-    input: CreateSourceCredentialInput,
-    identity: Identity,
-  ): Promise<SourceCredentialSummary> {
-    if (identity.role !== "owner" && identity.role !== "admin") {
-      throw new AuthzError(`role '${identity.role}' may not create source credentials`);
-    }
-    const entry = connectorCatalogEntry(input.connectorId);
-    if (entry.auth.managedBy === "nango" || this.config.nangoIntegrations[entry.connectionKey]) {
-      throw new Error(
-        `connector '${input.connectorId}' uses Halo-managed authorization; create a Nango connect session`,
-      );
-    }
-    const expected = entry.connectionKey;
-    if (input.connectionKey !== expected) {
-      throw new Error(
-        `connector '${input.connectorId}' belongs to connection family '${expected}'`,
-      );
-    }
-    const fields = new Map(entry.auth.fields.map((field) => [field.key, field]));
-    for (const key of Object.keys(input.config)) {
-      const field = fields.get(key);
-      if (!field) {
-        throw new Error(`connector '${input.connectorId}' does not declare credential field '${key}'`);
-      }
-      if (field.role === "source") {
-        throw new Error(
-          `connector '${input.connectorId}' source field '${key}' must be configured on the source`,
-        );
-      }
-    }
-    const credentialFields = entry.auth.fields.filter((field) => field.role !== "source");
-    for (const field of credentialFields) {
-      const raw = input.config[field.key];
-      const value = typeof raw === "string" ? raw.trim() : "";
-      if (field.required && !value) {
-        throw new Error(`connector '${input.connectorId}' credential '${field.key}' is required`);
-      }
-      if (field.minLength !== undefined && value.length < field.minLength) {
-        throw new Error(
-          `connector '${input.connectorId}' credential '${field.key}' must be at least ${field.minLength} characters`,
-        );
-      }
-    }
-    if (!entry.auth.fields.some((field) => field.role === "source" && field.required)) {
-      await this.connectorRegistry.require(input.connectorId).validateConfig(input.config);
-    }
-    return this.sourceCredentials.create(identity.namespace, input);
-  }
-
-  async createNangoConnectSession(
-    input: { connectorId: PlatformConnectorId; name: string },
-    identity: Identity,
-  ): Promise<{ attemptId: string; connectLink: string; expiresAt: string }> {
-    if (identity.role !== "owner" && identity.role !== "admin") {
-      await this.auditNango(identity, "denied", `connect_start:${input.connectorId}`);
-      throw new AuthzError(`role '${identity.role}' may not create source credentials`);
-    }
-    const entry = connectorCatalogEntry(input.connectorId);
-    if (!this.config.nangoIntegrations[entry.connectionKey]) {
-      await this.auditNango(identity, "error", `connect_start_unconfigured:${input.connectorId}`);
-      throw new NangoUnavailableError();
-    }
-    try {
-      const result = await this.nangoProxy.createConnectSession({
-        connectorId: input.connectorId,
-        organizationId: identity.namespace,
-        name: input.name,
-      });
-      await this.auditNango(identity, "ok", `connect_start:${input.connectorId}`);
-      return result;
-    } catch (error) {
-      await this.auditNango(identity, "error", `connect_start:${input.connectorId}`);
-      throw error;
-    }
-  }
-
-  async completeNangoConnectSession(
-    attemptId: string,
-    identity: Identity,
-  ): Promise<SourceCredentialSummary> {
-    if (identity.role !== "owner" && identity.role !== "admin") {
-      await this.auditNango(identity, "denied", "connect_complete");
-      throw new AuthzError(`role '${identity.role}' may not create source credentials`);
-    }
-    try {
-      const result = await this.nangoProxy.completeConnectAttempt({
-        attemptId,
-        organizationId: identity.namespace,
-      });
-      await this.auditNango(identity, "ok", `connect_complete:${result.connectorId}`);
-      return result;
-    } catch (error) {
-      await this.auditNango(identity, "error", "connect_complete");
-      throw error;
-    }
-  }
-
-  private async auditNango(
-    identity: Identity,
-    result: "ok" | "denied" | "error",
-    detail: string,
-  ): Promise<void> {
-    await this.audit.append({
-      ts: new Date().toISOString(),
-      actor: identity.actor,
-      agentId: "nango-proxy",
-      op: "write",
-      memoryId: null,
-      namespace: identity.namespace,
-      purpose: null,
-      result,
-      detail,
-    });
   }
 
   private auditPolicyUploadDenied(
@@ -5248,98 +4375,21 @@ export class Kernel {
     });
   }
 
-  listSourceCredentials(identity: Identity): Promise<SourceCredentialSummary[]> {
-    return this.sourceCredentials.list(identity.namespace);
-  }
-
-  /** Kernel-internal credential resolution; HTTP surfaces never expose this record. */
-  async resolveSourceCredential(
-    id: string,
-    connectorId: PlatformConnectorId,
-    identity: Identity,
-  ): Promise<SourceCredentialRecord> {
-    const credential = await this.sourceCredentials.get(id);
-    if (!credential || (!isRootOwner(identity) && credential.namespace !== identity.namespace)) {
-      throw new AuthzError(`source credential '${id}' is unavailable in this namespace`);
-    }
-    const expected = connectorCatalogEntry(connectorId).connectionKey;
-    if (credential.connectionKey !== expected) {
-      throw new Error(
-        `source credential '${id}' belongs to connection family '${credential.connectionKey}', not '${expected}'`,
-      );
-    }
-    return credential;
-  }
-
   private async sourceConnectorConfig(
     kind: SourceKind,
     config: Record<string, unknown>,
     namespace: Namespace,
   ): Promise<Record<string, unknown>> {
-    for (const key of ["nangoIntegrationId", "nangoConnectionId"]) {
+    void kind;
+    void namespace;
+    for (const key of ["credentialId", "nangoIntegrationId", "nangoConnectionId"]) {
       if (Object.prototype.hasOwnProperty.call(config, key)) {
-        throw new Error(`managed connection field '${key}' is server-owned`);
+        throw new Error(
+          `managed connection field '${key}' is unavailable in the standalone build`,
+        );
       }
     }
-    if (isPlatformConnectorId(kind)) {
-      const entry = connectorCatalogEntry(kind);
-      for (const field of entry.auth.fields) {
-        const nangoConfigured = Boolean(this.config.nangoIntegrations[entry.connectionKey]);
-        const sourceOwned = field.role === "source" || (nangoConfigured && !field.secret);
-        if (!sourceOwned && Object.prototype.hasOwnProperty.call(config, field.key)) {
-          throw new Error(
-            `connector '${kind}' credential field '${field.key}' must be stored in a reusable credential`,
-          );
-        }
-      }
-    }
-    if (typeof config.credentialId !== "string" || config.credentialId.length === 0) {
-      return this.injectGitHubTokenBroker(kind, { ...config }, namespace);
-    }
-    // A credential is usable inside its own namespace subtree: an org-root
-    // credential can back a team-scoped source, and a team credential backs
-    // only that team's sources. Sibling teams can never reach each other's
-    // credentials (sibling is neither self nor descendant).
-    const credential = await this.sourceCredentials.get(config.credentialId);
-    if (!credential || !isSelfOrDescendant(namespace, credential.namespace)) {
-      throw new AuthzError("source credential is unavailable in the source namespace");
-    }
-    const expected = connectorCatalogEntry(kind as PlatformConnectorId).connectionKey;
-    if (credential.connectionKey !== expected) {
-      throw new Error(
-        `source credential belongs to connection family '${credential.connectionKey}', not '${expected}'`,
-      );
-    }
-    // Source-local selectors are authoritative. Credential records contain
-    // only reusable connection material and may never override a source.
-    const merged = { ...credential.config, ...config };
-    delete merged.credentialId;
-    return this.injectGitHubTokenBroker(kind, merged, namespace);
-  }
-
-  /**
-   * M9 #1 (E3): a `github` source referencing an approved GitHub App
-   * installation (JSON-safe `installationRequestId`) gets the kernel-wired
-   * `mintToken` provider — short-lived installation tokens re-brokered on
-   * expiry by GitHubAppService.installationToken (audited
-   * `github_app_token_broker`), scoped to the SOURCE's namespace. Without
-   * this injection the brokerage minted tokens no sync path ever consumed
-   * and the only working credential was a long-lived PAT.
-   */
-  private injectGitHubTokenBroker(
-    kind: SourceKind,
-    config: Record<string, unknown>,
-    namespace: Namespace,
-  ): Record<string, unknown> {
-    if (kind !== "github") return config;
-    const installationRequestId = config.installationRequestId;
-    if (typeof installationRequestId !== "string" || installationRequestId.length === 0) {
-      return config;
-    }
-    return {
-      ...config,
-      mintToken: () => this.githubApp.installationToken(installationRequestId, namespace),
-    };
+    return { ...config };
   }
 
   /**
@@ -5379,48 +4429,16 @@ export class Kernel {
         return existing;
       }
     }
-    if (isPlatformConnectorId(kind) && connectorCatalogEntry(kind).auth.type !== "manual" &&
-        (typeof config.credentialId !== "string" || config.credentialId.length === 0)) {
-      throw new Error(`platform connector '${kind}' requires a reusable credentialId`);
-    }
     const connector = this.connectorRegistry.require(kind);
     const resolvedConfig = await this.sourceConnectorConfig(kind, config, namespace);
     const testConfig = kind === "postgres" && !resolvedConfig.query && !resolvedConfig.dsn
       ? { ...resolvedConfig, query: (sql: string, params?: unknown[]) => this.db.query(sql, params) }
       : resolvedConfig;
     await connector.validateConfig(testConfig);
-    await this.consumeEarlyAccess(identity, "source", "write", "source-register", {
+    await this.consumeQuota(identity, "source", "write", "source-register", {
       idempotencyKey: idempotencyKey ?? `source-register:${ulid()}`,
     });
     const source = await this.sources.register(namespace, kind, config, idempotencyKey);
-    // Direct exact-read surfaces are static (issues/pages), so publish their
-    // ACL-scoped route immediately. Notion's bounded one-page continuations
-    // can take many jobs before a full sync completes; waiting for completion
-    // would make a valid connected source ineligible for exact reads meanwhile.
-    if (kind === "linear_direct" || kind === "notion_direct") {
-      try {
-        await this.mintPointers(source.id, identity);
-      } catch (error) {
-        this.logger.warn("direct-source pointer minting failed at registration (brownout)", {
-          sourceId: source.id,
-          kind,
-          error: redactSourceError(error, config),
-        });
-      }
-    }
-    if (kind === "github") {
-      // M9 W3 (E55): the repo/branch/subpath allowlist state set at
-      // registration is an audited change (D4). Coordinates only — never
-      // credentials (the audit helper canonicalizes to owner/repo strings).
-      await auditGitHubAllowlistChange({
-        appendAudit: (event) => this.audit.append(event),
-        actor: identity.actor,
-        namespace: source.namespace,
-        sourceId: source.id,
-        before: null,
-        after: config,
-      });
-    }
     const stagedIngress = isStagedSourceKind(kind);
     if (!stagedIngress) {
       await new DurableJobStore(this.db).enqueue({
@@ -5575,21 +4593,6 @@ export class Kernel {
     const config = source.kind === "postgres" && !resolvedConfig.query && !resolvedConfig.dsn
       ? { ...resolvedConfig, query: (sql: string, params?: unknown[]) => this.db.query(sql, params) }
       : resolvedConfig;
-    if (source.kind === "linear_direct") {
-      config.mintToken = () => this.sourceOAuth.freshAccessToken(source.id, "linear");
-    }
-    if (source.kind === "notion_direct") {
-      config.mintToken = (forceRefresh = false, deadlineAt?: number) =>
-        this.sourceOAuth.freshAccessToken(source.id, "notion", forceRefresh, deadlineAt);
-    }
-    if (source.kind === "airtable_direct") {
-      config.mintToken = (forceRefresh = false, deadlineAt?: number) =>
-        this.sourceOAuth.freshAccessToken(source.id, "airtable", forceRefresh, deadlineAt);
-    }
-    if (isGoogleWorkspaceDirectKind(source.kind)) {
-      config.mintToken = (forceRefresh = false, deadlineAt?: number) =>
-        this.sourceOAuth.freshAccessToken(source.id, "google_drive", forceRefresh, deadlineAt);
-    }
     await connector.validateConfig(config);
     return connector.testConnection(config);
   }
@@ -5744,7 +4747,7 @@ export class Kernel {
     } | undefined;
     const newJobId = `source-sync:manual:${source.id}:${ulid()}`;
     if (existing === undefined) {
-      await this.consumeEarlyAccess(identity, "source_sync", "write", "source-sync", {
+      await this.consumeQuota(identity, "source_sync", "write", "source-sync", {
         idempotencyKey: newJobId,
       });
     }
@@ -5802,7 +4805,7 @@ export class Kernel {
           actor: "halomem-connector-worker",
           role: "admin",
         };
-        await this.consumeEarlyAccess(
+        await this.consumeQuota(
           workerIdentity,
           "source_sync",
           "write",
@@ -5823,7 +4826,7 @@ export class Kernel {
         }
         if (await jobs.complete(job.id, workerId)) completed++;
       } catch (error) {
-        if (error instanceof EarlyAccessLimitError) {
+        if (error instanceof QuotaLimitError) {
           await this.sources.markSyncFailed(
             job.payload.sourceId,
             `early-access-${error.code}`,
@@ -5904,23 +4907,6 @@ export class Kernel {
     if (source.kind === "postgres" && !config.query && !config.dsn) {
       config.query = (sql: string, params?: unknown[]) => this.db.query(sql, params);
     }
-    if (source.kind === "linear_direct") {
-      // Refresh-aware token broker: Linear access tokens live 24h; the broker
-      // rotates via the stored refresh token and re-seals the source config.
-      config.mintToken = () => this.sourceOAuth.freshAccessToken(source.id, "linear");
-    }
-    if (source.kind === "notion_direct") {
-      config.mintToken = (forceRefresh = false, deadlineAt?: number) =>
-        this.sourceOAuth.freshAccessToken(source.id, "notion", forceRefresh, deadlineAt);
-    }
-    if (source.kind === "airtable_direct") {
-      config.mintToken = (forceRefresh = false, deadlineAt?: number) =>
-        this.sourceOAuth.freshAccessToken(source.id, "airtable", forceRefresh, deadlineAt);
-    }
-    if (isGoogleWorkspaceDirectKind(source.kind)) {
-      config.mintToken = (forceRefresh = false, deadlineAt?: number) =>
-        this.sourceOAuth.freshAccessToken(source.id, "google_drive", forceRefresh, deadlineAt);
-    }
 
     const ctx = {
       sink,
@@ -5997,17 +4983,6 @@ export class Kernel {
       }
       await this.sources.touchLastSync(source.id, new Date().toISOString());
       await this.finalizeRelationshipImpact(landingIdentity, impact, false);
-      // M6 (D11): refresh the pointer catalog after every successful sync —
-      // one pointer fact per source surface, through the write path. Brownout:
-      // a minting failure never fails the sync that already landed.
-      try {
-        await this.mintPointers(sourceId, identity);
-      } catch (err) {
-        this.logger.warn("pointer minting failed after sync (brownout)", {
-          sourceId,
-          error: redactSourceError(err, config),
-        });
-      }
       await this.audit.append({
         ts: new Date().toISOString(), actor: identity.actor, agentId: identity.keyId,
         op: "write", memoryId: null, namespace: landingNamespace, purpose: null,
@@ -7077,7 +6052,7 @@ export class Kernel {
     }
     const policy = await this.policyStore.getFresh(identity.namespace);
     const namespaceLimit = policy.rateLimitPerMin ?? DEFAULT_RATE_LIMIT_PER_MIN;
-    const limit = earlyAccessRateLimitPerMin(
+    const limit = this.quota.rateLimitPerMin(
       effectiveRateLimit(namespaceLimit, tenant) ?? namespaceLimit,
       identity.actor,
     );
@@ -7153,1763 +6128,10 @@ export class Kernel {
     input: AgentSourceReadInput,
     identity: Identity,
   ): Promise<AgentSourceReadResult> {
-    if (identity.role !== "agent") {
-      await this.gatewayDenied(identity, input, "authorize", "agent-role-required", null);
-      throw new AuthzError("governed source read denied");
-    }
-    await this.gateAgentSourceRead(input, identity);
-    // Reading an organization backend is exactly the act guardrails exist to
-    // govern — record the exposure before the read resolves.
-    await this.notePolicyExposure(
-      identity,
-      this.syscallAgentId(identity, DEFAULT_AGENT_ID),
-      "source_read",
-    );
-
-    const grant = await this.gatewayGrants.getForKey(input.grantId, identity.keyId);
-    const pointer = await this.gatewayPointer(input, identity);
-    if (!grant || !pointer) {
-      await this.gatewayDenied(
-        identity,
-        input,
-        "authorize",
-        "authority-unavailable",
-        grant ?? undefined,
-      );
-      throw new AuthzError("governed source read denied");
-    }
-    const grantRateLimit = earlyAccessRateLimitPerMin(
-      grant.oversight.maxRequestsPerMinute,
-      identity.actor,
-    );
-    if (!(await this.rateLimiter.allow(
-      `gateway-grant:${grant.id}`,
-      grantRateLimit,
-    ))) {
-      await this.gatewayDenied(identity, input, "authorize", "rate-limit", grant);
-      throw new RateLimitError(
-        `rate limit exceeded (${grantRateLimit} requests/min for this grant)`,
-      );
-    }
-    const request = {
-      operation: "source-read" as const,
-      connectorId: input.connectorId,
-      sourceRef: input.sourceRef,
-      purpose: input.purpose,
-      ...(input.requestedFields !== undefined
-        ? { requestedFields: input.requestedFields }
-        : {}),
-      ...(input.requestedRows !== undefined ? { requestedRows: input.requestedRows } : {}),
-      ...(input.requestedBytes !== undefined ? { requestedBytes: input.requestedBytes } : {}),
-    };
-    let decision = authorizeAgentRequest({
-      identity: { keyId: identity.keyId, namespace: identity.namespace, role: "agent" },
-      grant,
-      request,
-      resourceSensitivity: pointer.classification?.sensitivity ?? "restricted",
-      ...(input.expectedPolicyVersion !== undefined
-        ? { expectedPolicyVersion: input.expectedPolicyVersion }
-        : {}),
-    });
-    let approvedRequest: AgentAccessRequest | null = null;
-    let capabilityGrant: AgentConnectionGrant | null = null;
-    if (!decision.allowed && input.accessRequestId !== undefined) {
-      const exact: ExactAgentAccessRequest = {
-        grantId: input.grantId,
-        connectorId: input.connectorId,
-        sourceRef: input.sourceRef,
-        operation: "source-read",
-        purpose: input.purpose,
-        requestedFields: input.requestedFields ?? [],
-        requestedRows: input.requestedRows ?? 0,
-        requestedBytes: input.requestedBytes ?? 0,
-      };
-      approvedRequest = await this.gatewayOversight.validateApprovedRequest(
-        input.accessRequestId,
-        exact,
-        { keyId: identity.keyId, namespace: identity.namespace, role: "agent" },
-      );
-      if (approvedRequest) {
-        capabilityGrant = {
-          ...grant,
-          allowedOperations: ["source-read"],
-          allowedSourceRefs: [approvedRequest.sourceRef],
-          allowedFields: { [approvedRequest.sourceRef]: [...approvedRequest.requestedFields] },
-          allowedPurposes: [approvedRequest.purpose],
-          maxRows: approvedRequest.requestedRows,
-          maxBytes: approvedRequest.requestedBytes,
-        };
-        decision = authorizeAgentRequest({
-          identity: { keyId: identity.keyId, namespace: identity.namespace, role: "agent" },
-          grant: capabilityGrant,
-          request,
-          resourceSensitivity: pointer.classification?.sensitivity ?? "restricted",
-          ...(input.expectedPolicyVersion !== undefined
-            ? { expectedPolicyVersion: input.expectedPolicyVersion }
-            : {}),
-        });
-      }
-    }
-    if (!decision.allowed) {
-      await this.gatewayDenied(identity, input, "authorize", decision.reason, grant);
-      throw new AuthzError(
-        this.agentSourceReadDeniedMessage(decision.reason, input.sourceRef, grant),
-      );
-    }
-
-    // D26: commit evidence before source lookup decrypts configuration or
-    // credential resolution occurs. Audit failure therefore means zero egress.
-    try {
-      await this.gatewayAudit(
-        identity,
-        input,
-        "ok",
-        "preflight",
-        `policy=${decision.policyVersion} rows=${decision.maxRows} bytes=${decision.maxBytes}`,
-      );
-    } catch (error) {
-      await this.recordAgentAccessEvent(
-        identity,
-        input,
-        grant,
-        "error",
-        "preflight-audit-failed",
-        0,
-        0,
-        decision.purpose,
-        approvedRequest?.id ?? null,
-      );
-      throw error;
-    }
-
-    if (approvedRequest && input.accessRequestId) {
-      const exact: ExactAgentAccessRequest = {
-        grantId: input.grantId,
-        connectorId: input.connectorId,
-        sourceRef: input.sourceRef,
-        operation: "source-read",
-        purpose: input.purpose,
-        requestedFields: input.requestedFields ?? [],
-        requestedRows: input.requestedRows ?? 0,
-        requestedBytes: input.requestedBytes ?? 0,
-      };
-      const consumed = await this.gatewayOversight.consumeApprovedRequest(
-        input.accessRequestId,
-        exact,
-        { keyId: identity.keyId, namespace: identity.namespace, role: "agent" },
-      );
-      if (!consumed) {
-        await this.gatewayDenied(
-          identity, input, "pre-egress", "approval-unavailable", grant, approvedRequest,
-        );
-        throw new AuthzError("governed source read denied");
-      }
-      approvedRequest = consumed;
-    }
-
-    if (!(await this.isIdentityActive(identity))) {
-      await this.gatewayDenied(
-        identity, input, "pre-egress", "credential-inactive", grant, approvedRequest,
-      );
-      throw new AuthzError("governed source read denied");
-    }
-    try {
-      tenantGate(await this.tenants.resolveTenant(identity.namespace));
-    } catch {
-      await this.gatewayDenied(
-        identity, input, "pre-egress", "tenant-suspended", grant, approvedRequest,
-      );
-      throw new AuthzError("governed source read denied");
-    }
-    const currentBeforeEgress = await this.gatewayGrants.getForKey(grant.id, identity.keyId);
-    if (!currentBeforeEgress || currentBeforeEgress.policyVersion !== decision.policyVersion) {
-      await this.gatewayDenied(
-        identity, input, "pre-egress", "authority-revoked", grant, approvedRequest,
-      );
-      throw new AuthzError("governed source read denied");
-    }
-    const sourceBeforeEgress = await this.sources.get(input.connectorId);
-    if (!sourceBeforeEgress || sourceBeforeEgress.lifecycleState !== "active") {
-      await this.gatewayDenied(
-        identity, input, "pre-egress", "connector-inactive", grant, approvedRequest,
-      );
-      throw new AuthzError("governed source read denied");
-    }
-    const pointerBeforeEgress = await this.gatewayPointer(input, identity);
-    if (!pointerBeforeEgress || pointerBeforeEgress.ref !== pointer.ref) {
-      await this.gatewayDenied(
-        identity, input, "pre-egress", "source-authority-changed", grant, approvedRequest,
-      );
-      throw new AuthzError("governed source read denied");
-    }
-    const policyBeforeEgress = await this.policyStore.getFresh(identity.namespace);
-    const currentAuthorization = authorizeAgentRequest({
-      identity: { keyId: identity.keyId, namespace: identity.namespace, role: "agent" },
-      grant: capabilityGrant
-        ? {
-            ...capabilityGrant,
-            status: currentBeforeEgress.status,
-            expiresAt: currentBeforeEgress.expiresAt,
-            policyVersion: currentBeforeEgress.policyVersion,
-          }
-        : currentBeforeEgress,
-      request,
-      resourceSensitivity: pointerBeforeEgress.classification?.sensitivity ?? "restricted",
-      expectedPolicyVersion: decision.policyVersion,
-    });
-    if (
-      !currentAuthorization.allowed ||
-      currentAuthorization.maxRows !== decision.maxRows ||
-      currentAuthorization.maxBytes !== decision.maxBytes ||
-      currentAuthorization.effectiveFields.length !== decision.effectiveFields.length ||
-      !currentAuthorization.effectiveFields.every((field, index) =>
-        field === decision.effectiveFields[index]
-      )
-    ) {
-      await this.gatewayDenied(
-        identity, input, "pre-egress", "authority-changed", grant, approvedRequest,
-      );
-      throw new AuthzError("governed source read denied");
-    }
-    try {
-      assertDestinationAllowed({
-        ...(pointerBeforeEgress.classification ?? {
-          sensitivity: "restricted" as const,
-          piiSubjects: [],
-          secretKinds: [],
-          allowedDestinations: [],
-        }),
-        allowedDestinations: policyBeforeEgress.restrictedDestinations ?? [],
-      }, "agent-context", { region: policyBeforeEgress.dataRegion });
-    } catch {
-      await this.gatewayDenied(
-        identity, input, "pre-egress", "classification-denied", grant, approvedRequest,
-      );
-      throw new AuthzError("governed source read denied");
-    }
-    if (
-      approvedRequest && capabilityGrant &&
-      !(await this.currentExactApproval(approvedRequest, input, identity, decision))
-    ) {
-      await this.gatewayDenied(
-        identity, input, "pre-egress", "approval-changed", grant, approvedRequest,
-      );
-      throw new AuthzError("governed source read denied");
-    }
-
-    try {
-      const connection = await this.l4GetConnection(input.connectorId, identity);
-      if (!connection || connection.credentialMode !== "service" ||
-          connection.connector === null || typeof connection.connector !== "object" ||
-          typeof (connection.connector as Partial<GovernedSourceReadable>).governedRead !== "function") {
-        await this.gatewayDenied(
-          identity, input, "pre-egress", "connector-unavailable", grant, approvedRequest,
-        );
-        throw new AuthzError("governed source read denied");
-      }
-      const credential = resolveCredential({
-        connectorId: connection.connectorId,
-        credentialMode: connection.credentialMode,
-        ...(connection.serviceSecret !== undefined
-          ? { serviceSecret: connection.serviceSecret }
-          : {}),
-      }, undefined);
-      const sourceResult = await (connection.connector as GovernedSourceReadable).governedRead({
-        query: input.query,
-        sourceRef: decision.sourceRef,
-        fields: [...decision.effectiveFields],
-        credential,
-        limit: decision.maxRows,
-        maxBytes: decision.maxBytes,
-        timeoutMs: 5_000,
-      });
-
-      const currentAfterEgress = await this.gatewayGrants.getForKey(grant.id, identity.keyId);
-      if (!currentAfterEgress || currentAfterEgress.policyVersion !== decision.policyVersion) {
-        await this.gatewayDenied(
-          identity, input, "post-egress", "authority-revoked", grant, approvedRequest,
-        );
-        throw new AuthzError("governed source read denied");
-      }
-      const sourceAfterEgress = await this.sources.get(input.connectorId);
-      if (!sourceAfterEgress || sourceAfterEgress.lifecycleState !== "active") {
-        await this.gatewayDenied(
-          identity, input, "post-egress", "connector-inactive", grant, approvedRequest,
-        );
-        throw new AuthzError("governed source read denied");
-      }
-      const pointerAfterEgress = await this.gatewayPointer(input, identity);
-      if (!pointerAfterEgress || pointerAfterEgress.ref !== pointer.ref) {
-        await this.gatewayDenied(
-          identity, input, "post-egress", "source-authority-changed", grant, approvedRequest,
-        );
-        throw new AuthzError("governed source read denied");
-      }
-      // Policy is mutable outside the immutable grant. Re-resolve it after
-      // backend completion so a concurrent restriction takes effect before
-      // any returned row reaches the agent.
-      const policyAfterEgress = await this.policyStore.getFresh(identity.namespace);
-      if (
-        approvedRequest && capabilityGrant &&
-        !(await this.currentExactApproval(approvedRequest, input, identity, decision))
-      ) {
-        await this.gatewayDenied(
-          identity, input, "post-egress", "approval-changed", grant, approvedRequest,
-        );
-        throw new AuthzError("governed source read denied");
-      }
-
-      // The connector is an untrusted cartridge at this boundary. Rebuild the
-      // projection, row cap, and byte count in the kernel instead of trusting
-      // its claimed result metadata.
-      const boundedRows: Record<string, unknown>[] = [];
-      let bytes = 2;
-      let truncated = sourceResult.truncated === true;
-      const rawRows = Array.isArray(sourceResult.rows) ? sourceResult.rows : [];
-      for (const raw of rawRows) {
-        if (boundedRows.length >= decision.maxRows) {
-          truncated = true;
-          break;
-        }
-        if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-          truncated = true;
-          continue;
-        }
-        const record = raw as Record<string, unknown>;
-        const projected = Object.fromEntries(
-          decision.effectiveFields.map((field) => [field, record[field]]),
-        );
-        const encoded = JSON.stringify(projected);
-        const nextBytes = bytes + (boundedRows.length > 0 ? 1 : 0) + Buffer.byteLength(encoded, "utf8");
-        if (nextBytes > decision.maxBytes) {
-          truncated = true;
-          break;
-        }
-        boundedRows.push(projected);
-        bytes = nextBytes;
-      }
-
-      const loweredFields = decision.effectiveFields.map((field) => field.toLowerCase());
-      const fieldSensitivity = loweredFields.some((field) =>
-        /(?:secret|password|token|private[_-]?key|credential)/.test(field))
-        ? "restricted" as const
-        : loweredFields.some((field) =>
-            /(?:email|phone|ssn|social[_-]?security|card|account)/.test(field))
-          ? "confidential" as const
-          : pointerAfterEgress.classification?.sensitivity;
-      const resultClassification = classifyData(JSON.stringify(boundedRows), {
-        ...(fieldSensitivity ? { sensitivity: fieldSensitivity } : {}),
-        allowedDestinations: policyAfterEgress.restrictedDestinations ?? [],
-      });
-      const resultDecision = authorizeAgentRequest({
-        identity: { keyId: identity.keyId, namespace: identity.namespace, role: "agent" },
-        grant: capabilityGrant
-          ? {
-              ...capabilityGrant,
-              status: currentAfterEgress.status,
-              expiresAt: currentAfterEgress.expiresAt,
-              policyVersion: currentAfterEgress.policyVersion,
-            }
-          : currentAfterEgress,
-        request,
-        resourceSensitivity: resultClassification.sensitivity,
-        expectedPolicyVersion: decision.policyVersion,
-      });
-      if (!resultDecision.allowed) {
-        await this.gatewayDenied(
-          identity, input, "post-egress", resultDecision.reason, grant, approvedRequest,
-        );
-        throw new AuthzError("governed source read denied");
-      }
-      try {
-        assertDestinationAllowed(resultClassification, "agent-context", {
-          region: policyAfterEgress.dataRegion,
-        });
-      } catch {
-        await this.gatewayDenied(
-          identity, input, "post-egress", "classification-denied", grant, approvedRequest,
-        );
-        throw new AuthzError("governed source read denied");
-      }
-      await this.gatewayAudit(
-        identity,
-        input,
-        boundedRows.length > 0 ? "ok" : "miss",
-        "result",
-        `rows=${boundedRows.length} bytes=${bytes} truncated=${truncated}`,
-      );
-      await this.recordAgentAccessEvent(
-        identity,
-        input,
-        grant,
-        "allowed",
-        boundedRows.length > 0 ? "completed" : "empty-result",
-        boundedRows.length,
-        bytes,
-        decision.purpose,
-        approvedRequest?.id ?? null,
-      );
-      return {
-        grantId: decision.grantId,
-        connectorId: decision.connectorId,
-        sourceRef: decision.sourceRef,
-        fields: decision.effectiveFields,
-        rows: boundedRows,
-        bytes,
-        truncated,
-        policyVersion: decision.policyVersion,
-      };
-    } catch (error) {
-      if (error instanceof AuthzError) throw error;
-      await this.gatewayAudit(identity, input, "error", "result", "reason=source-read-failed");
-      await this.recordAgentAccessEvent(
-        identity,
-        input,
-        grant,
-        "error",
-        "source-read-failed",
-        0,
-        0,
-        decision.purpose,
-        approvedRequest?.id ?? null,
-      );
-      throw new Error("governed source read unavailable");
-    }
+    await this.gatewayDenied(identity, input, "authorize", "connector-unavailable");
+    throw new AuthzError("governed source reads are unavailable in the standalone build");
   }
 
-  // -------------------------------------------------------------------------
-  // M6 federation (D11–D15) — pointer catalog, L4 live lane, write-back cache.
-  //
-  // Everything below is kernel-side binding: the federation modules under
-  // src/federation/ are structural and never see the store. ACL: pointer
-  // search uses the same ancestor IN-list as every other read; connections are
-  // re-fenced at dispatch; tickets are namespace-fenced at redemption.
-  // Passthrough tokens (D13) flow ONLY through resolveCredential — no method
-  // here logs, audits, persists, or echoes them.
-  // -------------------------------------------------------------------------
-
-  /**
-   * M6 test/demo seam: bind an in-process live connector for a source id.
-   * Sealed source configs are JSON — they cannot carry an injected query
-   * surface — so fixture-backed live sources register their connector here.
-   */
-  registerLiveConnector(sourceId: string, connector: unknown): void {
-    this.liveConnectors.set(sourceId, connector);
-  }
-
-  /**
-   * D11: search IS the router. Type-filtered, ACL-scoped (ancestor IN-list —
-   * a sibling tenant's pointers are unreachable) pointer search: vector lane
-   * when the embedder is up, BM25 lexical lane as the brownout fallback.
-   */
-  async matchPointers(
-    namespace: Namespace,
-    query: string,
-    k = 3,
-    access?: AccessSubject,
-  ): Promise<PointerMatch[]> {
-    return catalogMatchPointers(
-      { search: (q, kk) => this.pointerSearch(namespace, q, kk, access) },
-      query,
-      k,
-    );
-  }
-
-  /**
-   * Exact provider identifiers bypass semantic pointer ranking, but never the
-   * query-layer ACL or pointer requirement. Source resolution and credential
-   * checks run again before any provider call.
-   */
-  private async exactLivePointers(
-    namespace: Namespace,
-    query: string,
-    access?: AccessSubject,
-  ): Promise<PointerMatch[]> {
-    const expectedRef = linearIssueLiveQueryFromQuery(query)
-      ? "issues"
-      : notionPageIdFromQuery(query)
-        ? "pages"
-        : null;
-    if (expectedRef === null) return [];
-    const expectedKinds = expectedRef === "issues"
-      ? new Set<SourceKind>(["linear_direct"])
-      : new Set<SourceKind>(["notion", "notion_direct"]);
-    const rows = await this.index.listPointerCandidates(namespace, { limit: 1_000, access });
-    const parsed = await catalogMatchPointers({
-      search: async () => rows.map((pointer) => ({
-        ref: pointer.id,
-        content: pointer.content,
-        type: pointer.type,
-        provenance: pointer.provenance,
-        score: 1,
-        sourceAccess: pointer.sourceAccess,
-        classification: pointer.classification,
-      })),
-    }, query, 1_000);
-    const eligible = await Promise.all(parsed
-      .filter((pointer) => pointer.sourceRef === expectedRef)
-      .map(async (pointer) => {
-        const source = await this.sources.get(pointer.connectorId);
-        return source?.lifecycleState === "active" && expectedKinds.has(source.kind)
-          ? pointer
-          : null;
-      }));
-    const active = eligible.filter((pointer): pointer is PointerMatch => pointer !== null);
-    if (expectedRef !== "pages") return active.slice(0, 3);
-
-    // A Notion UUID is not globally unique to one HaloMem connection. Bind an
-    // exact read to the source row that previously imported that page. The
-    // source_documents lookup is only an ownership hint; the ACL-visible
-    // pointer intersection above remains the authority fence.
-    const pageId = notionPageIdFromQuery(query);
-    if (!pageId) return [];
-    const owners = await this.db.query(
-      `SELECT DISTINCT source_id, landing_namespace FROM source_documents
-        WHERE document_key = $1 OR document_key LIKE $2 ESCAPE '\\'`,
-      [pageId, `${escapeLikePattern(pageId)}#part:%`],
-    );
-    const ancestorNamespaces = new Set(namespaceAncestors(namespace));
-    const ownerIds = new Set(owners.rows.flatMap((row) => {
-      const landingNamespace = String(row.landing_namespace);
-      return ancestorNamespaces.has(landingNamespace) ||
-        readScopeAllows(access?.memoryReadScope, landingNamespace)
-        ? [String(row.source_id)]
-        : [];
-    }));
-    const owned = active
-      .filter((pointer) => ownerIds.has(pointer.connectorId))
-      .map((pointer) => ({
-        ...pointer,
-        documentKeys: [pageId],
-        documentOwnershipRequired: true,
-      }));
-    if (owned.length > 0) return owned.slice(0, 3);
-    // A visible ownership row is also a negative credential-routing fence. If
-    // its source is paused, disconnected, or missing a current pointer, never
-    // point-read the page with a different same-provider credential.
-    if (ownerIds.size > 0) return [];
-    // With exactly one authorized connection there is no credential ambiguity
-    // and point-reading a newly shared page is useful before the next sync.
-    return active.length === 1
-      ? [{ ...active[0]!, documentKeys: [pageId], documentOwnershipRequired: false }]
-      : [];
-  }
-
-  /**
-   * Turn ACL-visible L2 provenance into exact live source routes. The source
-   * row id—not a provider label or model-selected identifier—is the credential
-   * selector. Explicit source mentions narrow the eligible catalog first.
-   */
-  private async evidenceBoundLivePointers(
-    query: string,
-    identity: Identity,
-    hits: readonly ScoredRef[],
-    access: AccessSubject,
-  ): Promise<{ pointers: PointerMatch[]; explicitlyNamed: boolean; namedSourceIds: string[] }> {
-    const catalog = await this.copilotSourceSummaries(identity);
-    const named = catalog.filter((source) =>
-      source.lifecycleState === "active" && sourceMentioned(query, source));
-    const namedIds = new Set(named.map((source) => source.id));
-    const documents = new Map<string, Set<string>>();
-    const evidenceRefs = new Map<string, Set<string>>();
-    for (const hit of hits.slice(0, 8)) {
-      if (!hit.id) continue;
-      const read = await this.index.getById(hit.id, identity.namespace, access);
-      if (!read.obj) continue;
-      for (const entry of read.obj.provenance) {
-        if (!entry.sourceId || !entry.documentKey) continue;
-        if (namedIds.size > 0 && !namedIds.has(entry.sourceId)) continue;
-        const keys = documents.get(entry.sourceId) ?? new Set<string>();
-        keys.add(entry.documentKey);
-        documents.set(entry.sourceId, keys);
-        const refs = evidenceRefs.get(entry.sourceId) ?? new Set<string>();
-        refs.add(hit.id);
-        evidenceRefs.set(entry.sourceId, refs);
-      }
-    }
-
-    // A named backend remains eligible even when its relevant page has not
-    // synced yet; its connector may provide bounded native search.
-    const sourceIds = documents.size > 0
-      ? new Set(documents.keys())
-      : namedIds;
-    if (sourceIds.size === 0) {
-      return { pointers: [], explicitlyNamed: namedIds.size > 0, namedSourceIds: [...namedIds] };
-    }
-    const rows = await this.index.listPointerCandidates(identity.namespace, {
-      limit: 1_000,
-      access,
-    });
-    const parsed = await catalogMatchPointers({
-      search: async () => rows.map((pointer) => ({
-        ref: pointer.id,
-        content: pointer.content,
-        type: pointer.type,
-        provenance: pointer.provenance,
-        score: 1,
-        sourceAccess: pointer.sourceAccess,
-        classification: pointer.classification,
-      })),
-    }, query, 1_000);
-    const expectedKinds = notionPageIdFromQuery(query)
-      ? new Set<SourceKind>(["notion", "notion_direct"])
-      : linearIssueLiveQueryFromQuery(query)
-        ? new Set<SourceKind>(["linear_direct"])
-        : null;
-    const selected: PointerMatch[] = [];
-    for (const pointer of parsed) {
-      if (!sourceIds.has(pointer.connectorId)) continue;
-      const source = await this.sources.get(pointer.connectorId);
-      if (!source || source.lifecycleState !== "active") continue;
-      if (expectedKinds && !expectedKinds.has(source.kind)) continue;
-      selected.push({
-        ...pointer,
-        ...(documents.get(pointer.connectorId)?.size
-          ? {
-              documentKeys: [...documents.get(pointer.connectorId)!].slice(0, 10),
-              evidenceRefs: [...(evidenceRefs.get(pointer.connectorId) ?? [])].slice(0, 8),
-              documentOwnershipRequired: true,
-            }
-          : {}),
-      });
-      if (selected.length === 3) break;
-    }
-    return {
-      pointers: selected,
-      explicitlyNamed: namedIds.size > 0,
-      namedSourceIds: [...namedIds],
-    };
-  }
-
-  /** Revalidate durable source routes against current ACL-visible pointers. */
-  private async revalidateLiveRoutes(
-    namespace: Namespace,
-    routes: NonNullable<DurableLivePayload["routes"]>,
-    access: AccessSubject,
-  ): Promise<PointerMatch[]> {
-    const rows = await this.index.listPointerCandidates(namespace, { limit: 1_000, access });
-    const parsed = await catalogMatchPointers({
-      search: async () => rows.map((pointer) => ({
-        ref: pointer.id,
-        content: pointer.content,
-        type: pointer.type,
-        provenance: pointer.provenance,
-        score: 1,
-        sourceAccess: pointer.sourceAccess,
-        classification: pointer.classification,
-      })),
-    }, "live source route", 1_000);
-    const byRoute = new Map(routes.map((route) => [
-      `${route.sourceId}\u0000${route.sourceRef}`,
-      route,
-    ]));
-    const out: PointerMatch[] = [];
-    for (const pointer of parsed) {
-      const route = byRoute.get(`${pointer.connectorId}\u0000${pointer.sourceRef}`);
-      if (!route) continue;
-      const source = await this.sources.get(pointer.connectorId);
-      if (!source || source.lifecycleState !== "active") continue;
-      const currentDocumentKeys: string[] = [];
-      for (const documentKey of route.documentKeys.slice(0, 10)) {
-        const owned = await this.db.query(
-          `SELECT landing_namespace FROM source_documents
-            WHERE source_id = $1
-              AND (document_key = $2 OR document_key LIKE $3 ESCAPE '\\')
-            LIMIT 20`,
-          [
-            route.sourceId,
-            documentKey,
-            `${escapeLikePattern(documentKey)}#part:%`,
-          ],
-        );
-        const ancestorNamespaces = new Set(namespaceAncestors(namespace));
-        let visibleOwnership = owned.rows.some((row) => {
-          const landingNamespace = String(row.landing_namespace);
-          return ancestorNamespaces.has(landingNamespace) ||
-            readScopeAllows(access.memoryReadScope, landingNamespace);
-        });
-        if (!visibleOwnership) {
-          for (const evidenceRef of route.evidenceRefs?.slice(0, 8) ?? []) {
-            const evidence = await this.index.getById(evidenceRef, namespace, access);
-            if (evidence.obj?.provenance.some((entry) =>
-              entry.sourceId === route.sourceId &&
-              (entry.documentKey === documentKey ||
-                entry.documentKey?.startsWith(`${documentKey}#part:`)))) {
-              visibleOwnership = true;
-              break;
-            }
-          }
-        }
-        if (visibleOwnership || route.documentOwnershipRequired !== true) {
-          currentDocumentKeys.push(documentKey);
-        }
-      }
-      if (route.documentKeys.length > 0 && currentDocumentKeys.length === 0) {
-        continue;
-      }
-      out.push({ ...pointer, documentKeys: currentDocumentKeys });
-      if (out.length === 3) break;
-    }
-    return out;
-  }
-
-  /**
-   * Cheap ACL-scoped existence probe: does this namespace subtree have ANY
-   * live pointer fact? Runs BEFORE the embedding-backed pointer search on the
-   * awaited fault path so pointer-free deployments never pay a metered embed
-   * (or a pointer vector scan) per fault miss. Served by the partial index
-   * idx_mem_pointer_ns.
-   */
-  private async hasPointerFacts(namespace: Namespace, access?: AccessSubject): Promise<boolean> {
-    return this.index.hasPointerCandidates(namespace, access);
-  }
-
-  private async pointerSearch(
-    namespace: Namespace,
-    query: string,
-    k: number,
-    access?: AccessSubject,
-  ): Promise<PointerSearchHit[]> {
-    try {
-      const [vec] = await this.runtimeFor(namespace).embedder.embed([query]);
-      if (vec) {
-        const hits = await this.index.vectorSearchPointers(namespace, vec, k, access);
-        return hits.map((hit) => ({
-          ref: hit.obj.id,
-          content: hit.obj.content,
-          type: "pointer",
-          provenance: hit.obj.provenance,
-          score: hit.similarity,
-          sourceAccess: hit.obj.sourceAccess,
-          classification: hit.obj.classification,
-        }));
-      }
-    } catch {
-      // Embedder brownout → the lexical lane below (never hard-fail).
-    }
-    const rows = await this.index.listPointerCandidates(namespace, { limit: 500, access });
-    const byRef = new Map(rows.map((row) => [row.id, row]));
-    const ranked = bm25Rank(
-      query,
-      rows.map((row) => ({ ref: row.id, content: row.content })),
-      k,
-    );
-    return ranked.flatMap((hit) => {
-      const row = byRef.get(hit.ref);
-      if (!row) return [];
-      return [{
-        ref: hit.ref,
-        content: row.content,
-        type: "pointer",
-        provenance: row.provenance,
-        score: hit.score,
-        sourceAccess: row.sourceAccess,
-        classification: row.classification,
-      }];
-    });
-  }
-
-  /**
-   * D11: mint/refresh pointer facts for a registered source — one per source
-   * surface — entirely through the write path (D10: the IngestSink over
-   * performWrite). Same subtree ACL + landing rules as syncSource. Explicit
-   * `summaries` win; otherwise they are derived by introspection (postgres:
-   * one per table incl. column names; filesystem: the root + each top-level
-   * directory incl. file names).
-   */
-  async mintPointers(
-    sourceId: string,
-    identity: Identity,
-    summaries?: PointerSummary[],
-  ): Promise<{ minted: number; superseded: number }> {
-    const source = await this.sources.get(sourceId);
-    if (!source) throw new Error(`no source with id '${sourceId}'`);
-
-    const sourceIsAncestor = namespaceAncestors(identity.namespace).includes(source.namespace);
-    const sourceIsDescendant = isSelfOrDescendant(source.namespace, identity.namespace);
-    const canManageDescendant =
-      (identity.role === "owner" || identity.role === "admin") && sourceIsDescendant;
-    if (!isRootOwner(identity) && !sourceIsAncestor && !canManageDescendant) {
-      throw new AuthzError(
-        `denied: source '${sourceId}' is outside your namespace subtree`,
-      );
-    }
-    const landingNamespace =
-      isRootOwner(identity) || canManageDescendant
-        ? source.namespace
-        : identity.namespace;
-    const landingIdentity: Identity = { ...identity, namespace: landingNamespace };
-
-    const credentialMode: CredentialMode =
-      source.config.credentialMode === "passthrough" ? "passthrough" : "service";
-    const resolved = summaries ?? (await this.derivePointerSummaries(source.kind, source.config));
-    if (resolved.length === 0) return { minted: 0, superseded: 0 };
-
-    const writeRecord = await this.ingestWriteRecord(
-      landingIdentity,
-      {},
-      undefined,
-      undefined,
-      { enrollSeat: false },
-    );
-    const sink = makeIngestSink({
-      namespace: landingNamespace,
-      sourceId: source.id,
-      sourceKind: source.kind,
-      writeRecord,
-      destinationPolicy: await this.ingestDestinationPolicy(landingNamespace),
-      onClassificationDenied: this.ingestDenyAudit(landingIdentity, source.id),
-      writeFence: { kind: "source-active", sourceId: source.id },
-    });
-    return upsertPointers(sink, source.id, credentialMode, resolved);
-  }
-
-  /** Introspect a source into pointer summaries (D11: descriptions carry field names). */
-  private async derivePointerSummaries(
-    kind: SourceKind,
-    config: Record<string, unknown>,
-  ): Promise<PointerSummary[]> {
-    if (kind === "postgres") {
-      let query: QueryFn | null =
-        typeof config.query === "function" ? (config.query as QueryFn) : null;
-      let close: (() => Promise<void>) | undefined;
-      if (!query && !config.dsn) {
-        // Credential-free case: introspect HaloMem's own DB through the same
-        // injected surface syncSource wires — internal tables are excluded, so
-        // this typically yields zero pointers (nothing external to point at).
-        query = (sql: string, params?: unknown[]) => this.db.query(sql, params);
-      }
-      if (!query && typeof config.dsn === "string" && config.dsn.length > 0) {
-        assertSecurePostgresDsn(config.dsn, "PostgresConnector");
-        const pg = await import("pg");
-        const client = new pg.Client({ connectionString: config.dsn });
-        await client.connect();
-        query = async (sql, params) => client.query(sql, params as unknown[]);
-        close = () => client.end();
-      }
-      if (!query) return [];
-      try {
-        const res = await query(
-          `SELECT table_name, column_name FROM information_schema.columns
-           WHERE table_schema = 'public'
-           ORDER BY table_name, ordinal_position`,
-        );
-        const byTable = new Map<string, string[]>();
-        for (const raw of Array.isArray(res.rows) ? res.rows : []) {
-          if (raw === null || typeof raw !== "object") continue;
-          const row = raw as Record<string, unknown>;
-          if (typeof row.table_name !== "string" || typeof row.column_name !== "string") continue;
-          if (INTERNAL_TABLES.has(row.table_name)) continue;
-          const cols = byTable.get(row.table_name);
-          if (cols) cols.push(row.column_name);
-          else byTable.set(row.table_name, [row.column_name]);
-        }
-        return [...byTable.entries()].map(([table, cols]) => ({
-          sourceRef: table,
-          description:
-            `Postgres table ${table} in the connected source: ` +
-            `columns ${cols.join(", ")}. Live rows can be queried on demand.`,
-        }));
-      } finally {
-        if (close) await close();
-      }
-    }
-    if (kind === "filesystem") {
-      const root = config.path;
-      if (typeof root !== "string" || root.length === 0) return [];
-      const sample = async (dir: string): Promise<string[]> => {
-        const entries = await readdir(dir, { withFileTypes: true });
-        return entries.filter((e) => e.isFile()).map((e) => e.name).slice(0, 12);
-      };
-      const entries = await readdir(root, { withFileTypes: true });
-      const summaries: PointerSummary[] = [];
-      const rootFiles = entries.filter((e) => e.isFile()).map((e) => e.name).slice(0, 12);
-      summaries.push({
-        sourceRef: ".",
-        description:
-          `Filesystem source root: documents ${rootFiles.length > 0 ? rootFiles.join(", ") : "(directories only)"}. ` +
-          `Live file contents can be searched on demand.`,
-      });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        const files = await sample(join(root, entry.name));
-        summaries.push({
-          sourceRef: entry.name,
-          description:
-            `Filesystem directory ${entry.name}: documents ${files.length > 0 ? files.join(", ") : "(empty)"}. ` +
-            `Live file contents can be searched on demand.`,
-        });
-      }
-      return summaries;
-    }
-    if (kind === "linear_direct") {
-      return [{
-        sourceRef: "issues",
-        description:
-          "Linear workspace issues. Current filtered listings by workflow state and exact " +
-          "issue identifiers such as TEAM-123 can be read live. Exact reads include the " +
-          "title, description, state, project, assignee, priority, due date, URL, and " +
-          "complete comments.",
-      }];
-    }
-    if (kind === "notion" || kind === "notion_direct") {
-      return [{
-        sourceRef: "pages",
-        description:
-          "Notion workspace pages. Exact Notion page URLs or UUIDs can be read live with " +
-          "the current title and complete page content.",
-      }];
-    }
-    // slack/import/platform kinds: no live-query ability yet.
-    return [];
-  }
-
-  /** Add deterministic service vocabulary without accepting caller authority. */
-  private exactLiveRoutingQuery(query: string): { query: string; exact: boolean } {
-    const services: string[] = [];
-    if (linearIssueLiveQueryFromQuery(query)) services.push("Linear workspace issues");
-    if (notionPageIdFromQuery(query)) services.push("Notion workspace pages");
-    return services.length === 0
-      ? { query, exact: false }
-      : { query: `${services.join(" ")} ${query}`, exact: true };
-  }
-
-  /**
-   * D15: start a live confirmation behind mem_fault. Fires only when local
-   * memory did NOT satisfy from fresh L2 rows: an L3 answer or a miss always
-   * confirms live; an L2 answer served from CACHED facts (provenance
-   * cache:true) re-confirms so a stale cache heals (D14). A fresh local L2
-   * answer never dispatches. Per-namespace `federationCache: 'off'` disables
-   * the whole lane for the subtree.
-   */
-  private async l4Dispatch(
-    query: string,
-    opts: L4DispatchOptions,
-  ): Promise<L4DispatchOutcome | null> {
-    const identity = opts.identity;
-    const namespace = identity.namespace;
-    const agentId = opts.agentId;
-    if (identity.channelAssistant === true && !opts.channelAuthority) {
-      await this.l4Audit({
-        connectorId: "authority", outcome: "denied", latencyMs: 0,
-        reason: "channel_authority_missing",
-      }, identity, opts.agentId);
-      return null;
-    }
-    const policy = await this.policyStore.getFresh(namespace);
-    if (policy.federationCache === "off") return null;
-    const routing = this.exactLiveRoutingQuery(query);
-    const access = sourceAccessSubject(identity);
-    let bound = await this.evidenceBoundLivePointers(
-      query,
-      identity,
-      opts.phase1.injected,
-      access,
-    );
-    if (bound.explicitlyNamed && bound.pointers.length === 0) {
-      if (identity.channelAssistant === true && opts.channelAuthority) {
-        await this.assertChannelLiveAuthority(identity, opts.channelAuthority, agentId);
-      }
-      for (const sourceId of bound.namedSourceIds.slice(0, 3)) {
-        const source = await this.sources.get(sourceId);
-        if (!source || !this.sourceSupportsLiveSearch(source.id, source.kind)) continue;
-        try {
-          await this.mintPointers(source.id, identity);
-        } catch {
-          // Registration/sync remains the primary repair lane. A pointer
-          // write brownout leaves the local answer intact and performs no I/O.
-        }
-      }
-      bound = await this.evidenceBoundLivePointers(
-        query,
-        identity,
-        opts.phase1.injected,
-        access,
-      );
-    }
-
-    if (!routing.exact && !bound.explicitlyNamed && bound.pointers.length === 0 &&
-        opts.phase1.hit && opts.phase1.source === "L2") {
-      // A pointer fact matching the query is a ROUTE, not an answer; a cached
-      // fact is a stale-able copy that must re-confirm (D14/D15). Only a
-      // genuine local fact as the BEST-ranked answer suppresses the dispatch —
-      // weaker genuine facts riding along in the pack do not.
-      const best = opts.phase1.injected[0]?.ref;
-      if (typeof best !== "string" || best.length === 0) return null;
-      const fresh = await this.db.query(
-        `SELECT 1 FROM memory_objects
-          WHERE id = $1
-            AND type <> 'pointer'
-            AND NOT (provenance @> '[{"cache": true}]'::jsonb)
-          LIMIT 1`,
-        [best],
-      );
-      if (fresh.rows.length > 0) return null; // fresh local answer - no dispatch
-    }
-
-    let exactPointers = routing.exact
-      ? await this.exactLivePointers(namespace, query, access)
-      : [];
-    if (routing.exact && exactPointers.length === 0) {
-      // Registration is intentionally brownout-tolerant, so an older active
-      // direct source can exist without its static issues/pages route. Repair
-      // that metadata through the governed write path on the first exact read.
-      if (identity.channelAssistant === true && opts.channelAuthority) {
-        await this.assertChannelLiveAuthority(identity, opts.channelAuthority, agentId);
-      }
-      await this.repairExactDirectPointers(query, identity);
-      exactPointers = await this.exactLivePointers(namespace, query, access);
-    }
-    const exactProviderMatched = exactPointers.length > 0;
-    if (routing.exact) {
-      const evidenceSourceIds = new Set(bound.pointers
-        .filter((pointer) => (pointer.documentKeys?.length ?? 0) > 0)
-        .map((pointer) => pointer.connectorId));
-      if (evidenceSourceIds.size > 0) {
-        exactPointers = exactPointers
-          .filter((pointer) => evidenceSourceIds.has(pointer.connectorId))
-          .map((pointer) => {
-            const evidence = bound.pointers.find((candidate) =>
-              candidate.connectorId === pointer.connectorId &&
-              candidate.sourceRef === pointer.sourceRef);
-            return evidence?.documentKeys?.length
-              ? {
-                  ...pointer,
-                  documentKeys: evidence.documentKeys,
-                  evidenceRefs: evidence.evidenceRefs,
-                  documentOwnershipRequired: evidence.documentOwnershipRequired,
-                }
-              : pointer;
-          });
-      } else if (linearIssueLiveQueryFromQuery(query) && exactPointers.length > 1) {
-        // Linear team keys are not globally unique across connected
-        // workspaces. Without an ACL-visible fact that binds this identifier
-        // to one source, do not try arbitrary same-provider credentials.
-        exactPointers = [];
-      }
-    }
-    // Zero-pointer early-out: generic matching embeds through the caller's
-    // metered embedder. Avoid that cost when no ACL-visible route exists.
-    if (exactPointers.length === 0 && !(await this.hasPointerFacts(namespace, access))) return null;
-    const exactRouteRequired = notionPageIdFromQuery(query) !== null ||
-      (linearIssueLiveQueryFromQuery(query) &&
-        (exactProviderMatched || /\blinear\b/i.test(query)));
-    const pointers = exactPointers.length > 0
-      ? exactPointers
-      : exactRouteRequired
-        ? []
-        : bound.pointers.length > 0
-          ? bound.pointers
-          : await this.matchPointers(
-              namespace,
-              exactRouteRequired ? routing.query : query,
-              3,
-              access,
-            );
-    if (pointers.length === 0) return null; // clean miss stays kernel-side
-
-    const deps: L4Deps = {
-      // Pre-matched above (the dispatch decision needed them) — no double search.
-      matchPointers: async () => pointers,
-      getConnection: (connectorId) => this.l4GetConnection(connectorId, identity),
-      resolveCredential: (connection, sourceTokens) =>
-        resolveCredential(
-          {
-            connectorId: connection.connectorId,
-            credentialMode: connection.credentialMode,
-            ...(connection.serviceSecret !== undefined
-              ? { serviceSecret: connection.serviceSecret }
-              : {}),
-          },
-          sourceTokens,
-        ),
-      isLiveQueryable: (c) =>
-        c !== null &&
-        typeof c === "object" &&
-        typeof (c as { liveQuery?: unknown }).liveQuery === "function",
-      preflight: (connectorId) => this.l4Preflight(connectorId, identity, agentId),
-      writeBack: (docs, connectorId, pointer) =>
-        this.l4WriteBack(docs, connectorId, identity, agentId, pointer),
-      audit: (detail) => this.l4Audit(detail, identity, agentId),
-    };
-
-    void deps;
-    if (identity.channelAssistant === true && opts.channelAuthority) {
-      await this.assertChannelLiveAuthority(identity, opts.channelAuthority, agentId);
-    }
-    const jobClassification = classifyData(query, {
-      allowedDestinations: policy.restrictedDestinations ?? [],
-    });
-    assertDestinationAllowed(jobClassification, "durable-live-job", {
-      region: policy.dataRegion,
-    });
-    const ticket = ulid();
-    // Effective read projections are syscall-scoped and may be revoked. Never
-    // persist them as durable authority; the worker resolves them afresh.
-    const {
-      memoryReadScope: _memoryReadScope,
-      teamMemoryGrant: _teamMemoryGrant,
-      ...durableIdentity
-    } = identity;
-    await this.db.transaction(async (tx) => {
-      await new DurableTicketStore(tx).issue({
-        id: ticket,
-        kind: "live-query",
-        namespace,
-        subjectKey: identity.keyId,
-        expiresAt: new Date(Date.now() + LIVE_TICKET_TTL_MS).toISOString(),
-      });
-      await new DurableJobStore(tx).enqueue<DurableLivePayload>({
-        id: ticket,
-        kind: "live-query",
-        namespace,
-        payload: {
-          query,
-          identity: durableIdentity,
-          agentId,
-          routes: pointers.map((pointer) => ({
-            sourceId: pointer.connectorId,
-            sourceRef: pointer.sourceRef,
-            documentKeys: pointer.documentKeys?.slice(0, 10) ?? [],
-            ...(pointer.evidenceRefs?.length
-              ? { evidenceRefs: pointer.evidenceRefs.slice(0, 8) }
-              : {}),
-            ...(pointer.documentOwnershipRequired !== undefined
-              ? { documentOwnershipRequired: pointer.documentOwnershipRequired }
-              : {}),
-          })),
-          ...(opts.channelAuthority ? { channelAuthority: opts.channelAuthority } : {}),
-          ...(opts.sourceTokens ? { affinity: this.liveWorkerId } : {}),
-        },
-      });
-    });
-    if (opts.sourceTokens) this.liveSourceTokens.set(ticket, opts.sourceTokens);
-    void this.kickLiveJobs();
-    // Prune the namespace fence alongside the ticket's 120s TTL (unref'd so a
-    // short-lived process never waits on it; redeem-after-expiry already
-    // collapses to a miss either way).
-    return { ticket, sources: [...new Set(pointers.map((p) => p.connectorId))] };
-  }
-
-  /** Heal static exact-read routes for eligible active direct sources. */
-  private async repairExactDirectPointers(
-    query: string,
-    identity: Identity,
-  ): Promise<void> {
-    const expectedKinds: ReadonlySet<SourceKind> | null = linearIssueLiveQueryFromQuery(query)
-      ? new Set<SourceKind>(["linear_direct"])
-      : notionPageIdFromQuery(query)
-        ? new Set<SourceKind>(["notion", "notion_direct"])
-        : null;
-    if (!expectedKinds) return;
-    const ancestorSources = await this.sources.listExact(namespaceAncestors(identity.namespace));
-    const mayReadDescendants = isRootOwner(identity) || identity.role === "owner" ||
-      identity.role === "admin" || identity.channelAssistant === true;
-    const descendantSources = mayReadDescendants
-      ? await this.sources.list(identity.namespace, isRootOwner(identity))
-      : [];
-    const eligible = [...new Map(
-      [...ancestorSources, ...descendantSources]
-        .filter((source) => expectedKinds.has(source.kind) && source.lifecycleState === "active")
-        .map((source) => [source.id, source]),
-    ).values()].slice(0, 20);
-    for (const source of eligible) {
-      try {
-        await this.mintPointers(source.id, identity);
-      } catch (error) {
-        this.logger.warn("direct-source pointer repair failed (brownout)", {
-          sourceId: source.id,
-          kind: source.kind,
-          error: error instanceof Error ? error.name : "unknown",
-        });
-      }
-    }
-  }
-
-  /** D15: redeem a phase-2 ticket. Foreign/unknown/expired → undefined (miss). */
-  private kickLiveJobs(): Promise<void> {
-    if (!this.liveWorker) {
-      this.liveWorker = this.runLiveJobs().finally(() => {
-        this.liveWorker = null;
-      });
-    }
-    return this.liveWorker;
-  }
-
-  private async runLiveJobs(): Promise<void> {
-    const jobs = new DurableJobStore(this.db);
-    const workerId = this.liveWorkerId;
-    await this.expireLiveJobs();
-    for (;;) {
-      const job = await jobs.claim<DurableLivePayload>(workerId, {
-        kinds: ["live-query"], leaseMs: 60_000, affinity: workerId,
-      });
-      if (!job) return;
-      const heartbeat = setInterval(() => {
-        void jobs.renew(job.id, workerId, 60_000).catch(() => undefined);
-      }, 20_000);
-      heartbeat.unref?.();
-      try {
-        const result = await this.executeLiveJob(job.payload, this.liveSourceTokens.get(job.id));
-        await this.db.transaction(async (tx) => {
-          const completed = await new DurableJobStore(tx).complete(job.id, workerId);
-          if (!completed) throw new Error("live-query lease lost before completion");
-          await new DurableTicketStore(tx).complete(job.id, result);
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        await this.db.transaction(async (tx) => {
-          const failed = await new DurableJobStore(tx).fail(job.id, workerId, message);
-          if (failed) await new DurableTicketStore(tx).fail(job.id, message);
-        });
-      } finally {
-        clearInterval(heartbeat);
-        this.liveSourceTokens.delete(job.id);
-      }
-    }
-  }
-
-  private async executeLiveJob(
-    payload: DurableLivePayload,
-    sourceTokens?: Record<string, string>,
-  ): Promise<LiveResult> {
-    const { agentId, query } = payload;
-    let identity = payload.identity;
-    // Durable live jobs can outlive the process that accepted them. During a
-    // rolling upgrade, reject any legacy agent job before pointer lookup,
-    // credential resolution, backend execution, or cache write-back.
-    if (identity.role === "agent" && identity.channelAssistant !== true) {
-      await this.l4Audit({
-        connectorId: "authority", outcome: "denied", latencyMs: 0,
-        reason: "legacy_agent_job_denied",
-      }, identity, identity.keyId);
-      throw new AuthzError("legacy live backend access requires source_read");
-    }
-    if (identity.channelAssistant === true) {
-      if (!payload.channelAuthority) {
-        await this.l4Audit({
-          connectorId: "authority", outcome: "denied", latencyMs: 0,
-          reason: "channel_authority_missing",
-        }, identity, agentId);
-        throw new AuthzError("channel live-query authority is missing");
-      }
-      // Re-resolve the key row so durable work never trusts serialized source
-      // principals/groups or a stale Assistant-purpose marker.
-      const fresh = await this.auth.resolveChannelIdentity(identity.keyId);
-      if (!fresh || fresh.channelAssistant !== true ||
-          fresh.namespace !== identity.namespace || fresh.actor !== identity.actor) {
-        await this.l4Audit({
-          connectorId: "authority", outcome: "denied", latencyMs: 0,
-          reason: "channel_identity_stale",
-        }, identity, agentId);
-        throw new AuthzError("channel live-query identity is stale");
-      }
-      identity = fresh;
-      await this.assertChannelLiveAuthority(identity, payload.channelAuthority, agentId);
-    }
-    const credentialActive = await this.isIdentityActive(identity);
-    if (!credentialActive) {
-      await this.l4Audit({
-        connectorId: "authority", outcome: "denied", latencyMs: 0,
-        reason: "credential_inactive",
-      }, identity, agentId);
-      throw new AuthzError("live-query credential is inactive or revoked");
-    }
-    tenantGate(await this.tenants.resolveTenant(identity.namespace));
-    return this.withTeamMemoryRead(identity, async (effectiveIdentity) => {
-      const access = sourceAccessSubject(effectiveIdentity);
-      const routing = this.exactLiveRoutingQuery(query);
-      const hasDurableRoutes = payload.routes !== undefined;
-      const routedPointers = payload.routes?.length
-        ? await this.revalidateLiveRoutes(effectiveIdentity.namespace, payload.routes, access)
-        : [];
-      const exactPointers = !hasDurableRoutes && routedPointers.length === 0 && routing.exact
-        ? await this.exactLivePointers(effectiveIdentity.namespace, query, access)
-        : [];
-      const exactRouteRequired = notionPageIdFromQuery(query) !== null ||
-        (linearIssueLiveQueryFromQuery(query) &&
-          (exactPointers.length > 0 || /\blinear\b/i.test(query)));
-      const pointers = routedPointers.length > 0
-        ? routedPointers
-        : hasDurableRoutes
-          ? []
-          : exactPointers.length > 0
-            ? exactPointers
-            : exactRouteRequired
-              ? []
-              : await this.matchPointers(
-                  effectiveIdentity.namespace,
-                  exactRouteRequired ? routing.query : query,
-                  3,
-                  access,
-                );
-      const recheckChannelAuthority = async (): Promise<void> => {
-        if (payload.channelAuthority) {
-          await this.assertChannelLiveAuthority(
-            effectiveIdentity,
-            payload.channelAuthority,
-            agentId,
-          );
-        }
-      };
-      const deps: L4Deps = {
-        matchPointers: async () => pointers,
-        // Re-read the exact channel grant immediately before connector and
-        // credential resolution, closing pause/disconnect/reassignment races.
-        getConnection: async (connectorId) => {
-          await recheckChannelAuthority();
-          return this.l4GetConnection(connectorId, effectiveIdentity);
-        },
-        resolveCredential: (connection, tokens) => resolveCredential({
-          connectorId: connection.connectorId,
-          credentialMode: connection.credentialMode,
-          ...(connection.serviceSecret !== undefined
-            ? { serviceSecret: connection.serviceSecret }
-            : {}),
-        }, tokens),
-        isLiveQueryable: (connector) => connector !== null && typeof connector === "object" &&
-          typeof (connector as { liveQuery?: unknown }).liveQuery === "function",
-        preflight: async (connectorId) => {
-          await recheckChannelAuthority();
-          await this.l4Preflight(connectorId, effectiveIdentity, agentId);
-        },
-        writeBack: async (docs, connectorId, pointer) => {
-          await recheckChannelAuthority();
-          return this.l4WriteBack(docs, connectorId, effectiveIdentity, agentId, pointer);
-        },
-        audit: (detail) => this.l4Audit(detail, effectiveIdentity, agentId),
-      };
-      const result = await runL4(deps, query, { sourceTokens, limit: 10, maxSources: 3 });
-      // A revocation that lands while the provider is in flight discards the
-      // result even when there were no docs to write back.
-      await recheckChannelAuthority();
-      return result;
-    });
-  }
-
-  /** Exact, fail-closed channel grant/epoch fence for deferred live reads. */
-  private async assertChannelLiveAuthority(
-    identity: Identity,
-    fence: ChannelAuthorityContext,
-    agentId: string,
-  ): Promise<void> {
-    const connection = await this.channels.repositories.connections.getExact(
-      identity.namespace,
-      fence.connectionId,
-    );
-    const grant = await this.channels.repositories.connections.getActiveGrantExact(
-      identity.namespace,
-      fence.connectionId,
-    );
-    const valid = connection !== null && grant !== null &&
-      connection.lifecycleState === "active" &&
-      (connection.authorityState === "halomem_inbound" ||
-        connection.authorityState === "halomem_active") &&
-      connection.authorityEpoch === fence.authorityEpoch &&
-      connection.credentialVersion === fence.credentialVersion &&
-      grant.id === fence.grantId &&
-      grant.revision === fence.grantRevision &&
-      grant.keyId === identity.keyId &&
-      grant.authorityEpoch === fence.authorityEpoch &&
-      grant.credentialVersion === fence.credentialVersion &&
-      grant.inboundAllowed &&
-      !grant.systemTest &&
-      !grant.verificationOnly;
-    if (valid) return;
-    await this.l4Audit({
-      connectorId: "authority", outcome: "denied", latencyMs: 0,
-      reason: "channel_authority_stale",
-    }, identity, agentId);
-    throw new AuthzError("channel live-query authority is stale");
-  }
-
-  private async expireLiveJobs(): Promise<void> {
-    const now = new Date().toISOString();
-    await this.db.transaction(async (tx) => {
-      await tx.query(
-        `UPDATE durable_jobs SET state = 'failed', lease_owner = NULL,
-           lease_expires_at = NULL, last_error = 'ticket expired', updated_at = $1
-         WHERE kind = 'live-query' AND state IN ('queued', 'running')
-           AND id IN (SELECT id FROM durable_tickets WHERE expires_at <= $1)`,
-        [now],
-      );
-      await tx.query(
-        `UPDATE durable_tickets SET state = 'failed', error = 'ticket expired', updated_at = $1
-         WHERE kind = 'live-query' AND state = 'running' AND expires_at <= $1`,
-        [now],
-      );
-    });
-  }
-
-  private async l4Result(
-    ticket: string,
-    identity: Identity,
-    sourceTokens?: Record<string, string>,
-  ): Promise<LiveResult | undefined> {
-    const durable = await this.durableTickets.resolve<LiveResult>(ticket, identity);
-    if (!durable) {
-      this.liveSourceTokens.delete(ticket);
-      return undefined;
-    }
-    if (durable.state === "done" && durable.result) {
-      this.liveSourceTokens.delete(ticket);
-      return durable.result;
-    }
-    if (durable.state === "failed") {
-      this.liveSourceTokens.delete(ticket);
-      return { state: "failed", blocks: [], superseded: [], sources: [] };
-    }
-    if (sourceTokens) {
-      this.liveSourceTokens.set(ticket, sourceTokens);
-      const rebound = await this.db.query(
-        `UPDATE durable_jobs SET payload = jsonb_set(payload, '{affinity}', to_jsonb($2::text)),
-           available_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1 AND kind = 'live-query' AND namespace = $3
-           AND state IN ('queued','running')
-         RETURNING id`,
-        [ticket, this.liveWorkerId, identity.namespace],
-      );
-      if (rebound.rows.length === 0) {
-        this.liveSourceTokens.delete(ticket);
-        return undefined;
-      }
-      void this.kickLiveJobs();
-    }
-    return { state: "running", blocks: [], superseded: [], sources: [] };
-  }
-
-  /**
-   * Resolve the live connection behind a pointer's connectorId (a source
-   * registry row id). Belt-and-braces cross-tenant fence: pointer matching is
-   * already ACL-scoped, and this second check admits only source ancestors or
-   * an owner/admin's explicit governance subtree. Memory read-scope widening
-   * alone never grants credential use.
-   */
-  private async l4GetConnection(
-    connectorId: string,
-    identity: Identity,
-  ): Promise<L4Connection | null> {
-    const source = await this.sources.get(connectorId);
-    if (!source || source.lifecycleState !== "active") return null;
-    const sourceIsAncestor = namespaceAncestors(identity.namespace).includes(source.namespace);
-    const sourceIsGovernedDescendant =
-      (identity.role === "owner" || identity.role === "admin" || identity.channelAssistant === true) &&
-      isSelfOrDescendant(source.namespace, identity.namespace);
-    if (
-      !isRootOwner(identity) &&
-      !sourceIsAncestor &&
-      !sourceIsGovernedDescendant
-    ) {
-      return null;
-    }
-    const config = source.config;
-    const credentialMode: CredentialMode =
-      config.credentialMode === "passthrough" ? "passthrough" : "service";
-    const connector =
-      this.liveConnectors.get(connectorId) ??
-      this.buildLiveConnector(source.kind, config);
-    let serviceSecret = this.serviceSecretFor(source.kind, config);
-    if (credentialMode === "service" && source.kind === "linear_direct") {
-      try {
-        serviceSecret = await this.sourceOAuth.freshAccessToken(
-          source.id,
-          "linear",
-          false,
-          Date.now() + 5_000,
-        );
-      } catch {
-        serviceSecret = undefined;
-      }
-    }
-    if (credentialMode === "service" && source.kind === "notion_direct") {
-      try {
-        serviceSecret = await this.sourceOAuth.freshAccessToken(
-          source.id,
-          "notion",
-          false,
-          Date.now() + 5_000,
-        );
-      } catch {
-        serviceSecret = undefined;
-      }
-    }
-    if (credentialMode === "service" && isGoogleWorkspaceDirectKind(source.kind)) {
-      try {
-        serviceSecret = await this.sourceOAuth.freshAccessToken(
-          source.id, "google_drive", false, Date.now() + 5_000,
-        );
-      } catch {
-        serviceSecret = undefined;
-      }
-    }
-    return {
-      connectorId,
-      credentialMode,
-      ...(serviceSecret !== undefined ? { serviceSecret } : {}),
-      connector,
-    };
-  }
-
-  /** Construct the production live connector for a source kind + config. */
-  private buildLiveConnector(
-    kind: SourceKind,
-    config: Record<string, unknown>,
-  ): unknown {
-    if (kind === "postgres") {
-      return new PostgresConnector(
-        typeof config.query === "function" ? { query: config.query } : {},
-      );
-    }
-    if (kind === "filesystem") {
-      return new FilesystemConnector({
-        path: config.path,
-        ...(config.exts !== undefined ? { exts: config.exts } : {}),
-      });
-    }
-    // Other kinds have no liveQuery yet → the lane audits 'not-live-queryable'.
-    return this.connectorRegistry.get(kind);
-  }
-
-  /**
-   * The already-decrypted service secret for a connection (M4 key handling:
-   * source configs are sealed at rest; SourceRegistry.get opened it). For
-   * postgres the DSN IS the secret; filesystem needs none (the path stands in
-   * so the broker resolves). Passthrough connections ignore this entirely.
-   */
-  private serviceSecretFor(
-    kind: SourceKind,
-    config: Record<string, unknown>,
-  ): string | undefined {
-    if (typeof config.serviceSecret === "string" && config.serviceSecret.length > 0) {
-      return config.serviceSecret;
-    }
-    if (kind === "postgres" && typeof config.dsn === "string" && config.dsn.length > 0) {
-      return config.dsn;
-    }
-    if (kind === "filesystem" && typeof config.path === "string" && config.path.length > 0) {
-      return config.path;
-    }
-    if ((kind === "notion" || kind === "notion_direct") &&
-        typeof config.accessToken === "string" && config.accessToken.length > 0) {
-      return config.accessToken;
-    }
-    if (kind === "notion" && typeof config.token === "string" && config.token.length > 0) {
-      return config.token;
-    }
-    if (kind === "linear_direct" &&
-        typeof config.accessToken === "string" && config.accessToken.length > 0) {
-      return config.accessToken;
-    }
-    if (isGoogleWorkspaceDirectKind(kind) &&
-        typeof config.accessToken === "string" && config.accessToken.length > 0) {
-      return config.accessToken;
-    }
-    return undefined;
-  }
-
-  /**
-   * D10/D14: write live docs back through the FULL write path (extraction,
-   * verification, PII, dedupe, supersedence) as cached facts — provenance
-   * `{source:'live-fetch', sourceId, cache:true}`, TTL 3600s, capped at 10
-   * stored facts. Returns ContextBlocks built from the STORED (verified)
-   * facts only — never raw source payloads — plus any cached facts a
-   * contradicting live row superseded (D7 chain).
-   */
-  private async l4WriteBack(
-    docs: LiveDoc[],
-    connectorId: string,
-    identity: Identity,
-    agentId: string,
-    pointer?: PointerMatch,
-  ): Promise<{ blocks: ContextBlock[]; supersededIds: string[] }> {
-    const namespace = identity.namespace;
-    const policy = await this.policyStore.getFresh(namespace);
-    const tenant = await this.tenants.resolveTenant(namespace);
-    const source = await this.sources.get(connectorId);
-    if (!source || source.lifecycleState !== "active") {
-      return { blocks: [], supersededIds: [] };
-    }
-    const access = sourceAccessSubject(identity);
-    const blocks: ContextBlock[] = [];
-    const supersededIds: string[] = [];
-    // D14: "at most 10 facts per fault are cached" is a cap on ROWS LANDED,
-    // not on docs or returned blocks. LLM extraction fans one doc out to N
-    // candidate facts, so each per-doc write carries the REMAINING cache
-    // budget (req.maxFacts) — the write path stops storing at the cap and
-    // reports the overflow rejected. Every stored fact becomes a block, so
-    // phase-2 never under-reports what was written.
-    const CACHE_LIMIT = 10;
-    let storedCount = 0;
-    for (const doc of docs) {
-      if (storedCount >= CACHE_LIMIT) break;
-      const effectiveSourceAccess = doc.sourceAccess ?? pointer?.sourceAccess ?? {
-        principals: [], groups: [],
-      };
-      // Native ACL metadata is untrusted provider input until intersected with
-      // the server-resolved caller subject. A nonmatching document is neither
-      // cached nor returned for this request.
-      if (!liveSourceAccessAllows(effectiveSourceAccess, access)) continue;
-      const contentHash = createHash("sha256").update(doc.content, "utf8").digest("hex");
-      const req: WriteRequest = {
-        namespace,
-        scope: "org",
-        content: doc.content,
-        actor: identity.actor,
-        // Preserve an exact source object as one complete candidate, but do
-        // not use the no-LLM verbatim shortcut: live content remains untrusted
-        // and must traverse verifier, DLP/classification, policy, embedding,
-        // dedupe/supersedence, provenance, and audit (D10/D14).
-        hints: {
-          verbatim: false,
-          ...(doc.preserveDocument ? { preserveSourceDocument: true } : {}),
-        },
-        ttlSeconds: 3600,
-        maxFacts: CACHE_LIMIT - storedCount,
-        provenance: {
-          source: "live-fetch",
-          sourceId: connectorId,
-          sourceKind: source.kind,
-          documentKey: doc.docId,
-          contentHash,
-          connectorId,
-          sourceRef: doc.sourceRef,
-          cache: true,
-          sourceAccess: effectiveSourceAccess,
-          classification: doc.classification ?? pointer?.classification,
-        },
-      };
-      const reused: MemoryObject[] = [];
-      const result = await performWrite(
-        this.deps,
-        req,
-        policy,
-        identity,
-        agentId,
-        tenant,
-        { onDeduplicated: (obj) => reused.push(obj) },
-      );
-      storedCount += result.stored.length;
-      for (const obj of [...result.stored, ...reused]) {
-        if (blocks.some((block) => block.ref === obj.id)) continue;
-        const scoped = await this.index.getById(obj.id, namespace, access);
-        if (!scoped.obj) continue;
-        const exactSource = scoped.obj.provenance.some((entry) =>
-          entry.source === "live-fetch" && entry.sourceId === connectorId &&
-          entry.documentKey === doc.docId);
-        if (!exactSource) continue;
-        blocks.push({
-          kind: "predicted-relevant",
-          ref: scoped.obj.id,
-          content: scoped.obj.content,
-          tokenEstimate: estimateTokens(scoped.obj.content),
-          orderKey: `l4:${scoped.obj.id}`,
-        });
-      }
-      supersededIds.push(...result.superseded);
-    }
-    return { blocks, supersededIds };
-  }
-
-  /**
-   * D4: one audit row per L4 dispatch, including denied/miss/error. The
-   * reason vocabulary is the lane's fixed token-free set — never a source
-   * error message, never a token.
-   */
-  private async l4Audit(
-    detail: {
-      connectorId: string;
-      outcome: "hit" | "miss" | "denied" | "error";
-      latencyMs: number;
-      reason?: string;
-    },
-    identity: Identity,
-    agentId: string,
-  ): Promise<void> {
-    await this.audit.append({
-      ts: new Date().toISOString(),
-      actor: identity.actor,
-      agentId,
-      op: "fault",
-      memoryId: null,
-      namespace: identity.namespace,
-      purpose: null,
-      result: detail.outcome === "hit" ? "ok" : detail.outcome,
-      detail:
-        `l4_source=${detail.connectorId} outcome=${detail.outcome} ` +
-        `latencyMs=${detail.latencyMs}` +
-        (detail.reason ? ` reason=${detail.reason}` : ""),
-    });
-  }
-
-  /** Content-free, committed evidence required before external provider I/O. */
-  private async l4Preflight(
-    connectorId: string,
-    identity: Identity,
-    agentId: string,
-  ): Promise<void> {
-    await this.audit.append({
-      ts: new Date().toISOString(),
-      actor: identity.actor,
-      agentId,
-      op: "fault",
-      memoryId: null,
-      namespace: identity.namespace,
-      purpose: null,
-      result: "ok",
-      detail: `l4_preflight=${connectorId} outcome=authorized`,
-    });
-  }
-
-  /** D14: the CacheStore the keeper sweeps — cached facts only, archive-not-delete. */
-  private buildCacheStore(): CacheStore {
-    const db = this.db;
-    const toIsoOrNull = (v: unknown): string | null => {
-      if (v === null || v === undefined) return null;
-      if (v instanceof Date) return v.toISOString();
-      return new Date(String(v)).toISOString();
-    };
-    return {
-      async listCached() {
-        const res = await db.query(
-          `SELECT id, last_accessed, assertion_time, access_count, ttl_seconds
-             FROM memory_objects
-            WHERE status = 'active' AND provenance @> '[{"cache": true}]'::jsonb`,
-        );
-        return (res.rows as Record<string, unknown>[]).map((row) => ({
-          id: String(row.id),
-          lastAccessed: toIsoOrNull(row.last_accessed),
-          assertionTime: toIsoOrNull(row.assertion_time) ?? new Date(0).toISOString(),
-          accessCount: Number(row.access_count ?? 0),
-          ttlSeconds:
-            row.ttl_seconds === null || row.ttl_seconds === undefined
-              ? null
-              : Number(row.ttl_seconds),
-        }));
-      },
-      async archive(ids) {
-        if (ids.length === 0) return 0;
-        const ph = ids.map((_, i) => `$${i + 1}`).join(", ");
-        const res = await db.query(
-          `UPDATE memory_objects SET status = 'archived'
-            WHERE id IN (${ph}) AND status = 'active'
-            RETURNING id`,
-          ids,
-        );
-        return res.rows.length;
-      },
-    };
-  }
-
-  // -------------------------------------------------------------------------
-  // M4 tenancy admin — a tenant is a root namespace with per-tenant caps +
-  // suspend/activate (a bulk revoke). register() is OWNER-only (enforced in
-  // TenantRegistry against the resolved Identity); list() is ancestor-ACL
-  // scoped so a caller never sees a sibling tenant. suspend/activate take an
-  // id; the transport/CLI layer gates them to owner/admin like the other
-  // admin mutations.
-  // -------------------------------------------------------------------------
-
-  /** Register a tenant (owner only — the registry checks `identity.role`). */
   registerTenant(
     input: Parameters<TenantRegistry["register"]>[0],
     identity: Identity,
@@ -9264,57 +6486,6 @@ export class Kernel {
     return computeReadiness(this, identity);
   }
 
-  /** M9 #15 (E48–E50): S15 user-analytics segmentation for the caller's subtree. */
-  userAnalytics(
-    identity: Identity,
-    params?: UserAnalyticsParams,
-  ): Promise<UserAnalyticsResult> {
-    return consoleUserAnalytics({ db: this.db }, identity, params);
-  }
-
-  /** M9 #16 (E51): unified missing|wrong gap feed for the caller's subtree. */
-  /** Usage analytics: the paginated query-traction ledger (subtree-scoped). */
-  usageQueries(
-    identity: Identity,
-    params?: UsageQueriesParams,
-  ): Promise<UsageQueriesResult> {
-    return consoleUsageQueries({ db: this.db }, identity, params);
-  }
-
-  /** Usage analytics: one trace's timeline; null = missing OR not visible. */
-  usageQueryTrace(
-    identity: Identity,
-    traceId: string,
-  ): Promise<UsageQueryTraceResult | null> {
-    return consoleUsageQueryTrace({ db: this.db }, identity, traceId);
-  }
-
-  /** Usage analytics: grouped traction rollup + rule-based observations. */
-  usageRollup(
-    identity: Identity,
-    params?: UsageRollupParams,
-  ): Promise<UsageRollupResult> {
-    return consoleUsageRollup({ db: this.db }, identity, params);
-  }
-
-  /** Metadata-only Halo Assistant turn ledger. */
-  usageAiTurns(identity: Identity, params?: AiTurnsParams): Promise<AiTurnsResult> {
-    return consoleUsageAiTurns({ db: this.db }, identity, params);
-  }
-
-  /** One metadata-only Assistant turn; null also covers a foreign turn. */
-  usageAiTurnDetail(identity: Identity, turnId: string): Promise<AiTurnDetailResult | null> {
-    return consoleUsageAiTurnDetail({ db: this.db }, identity, turnId);
-  }
-
-  /** Halo Assistant spend/usage aggregates, including anonymized recycled history. */
-  usageAiRollup(
-    identity: Identity,
-    params?: { days?: number; period?: "month"; groupBy?: AiRollupGroupBy },
-  ): Promise<AiRollupResult> {
-    return consoleUsageAiRollup({ db: this.db }, identity, params);
-  }
-
   assistantRecycleBin(identity: Identity) {
     return listAssistantRecycleBin(this.db, identity);
   }
@@ -9622,172 +6793,6 @@ export class Kernel {
       return Promise.resolve({ claimed: 0, completed: 0, proposals: 0 });
     }
     return this.automationRunner.runAutomationJobsOnce(limit);
-  }
-
-  /** Bind the application runtime without introducing a Kernel import cycle. */
-  attachCopilotRoutineExecutor(executor: CopilotRoutineExecutor): void {
-    this.copilotRoutineExecutor = executor;
-  }
-
-  async listCopilotRoutines(identity: Identity): Promise<{ routines: CopilotRoutine[] }> {
-    return { routines: await this.copilotRoutines.list(identity) };
-  }
-
-  createCopilotRoutine(
-    identity: Identity,
-    input: CopilotRoutineCreateInput,
-  ): Promise<CopilotRoutine> {
-    return this.copilotRoutines.create(identity, input);
-  }
-
-  updateCopilotRoutine(
-    identity: Identity,
-    id: string,
-    input: CopilotRoutineUpdateInput,
-  ): Promise<CopilotRoutine> {
-    return this.copilotRoutines.update(identity, id, input);
-  }
-
-  deleteCopilotRoutine(identity: Identity, id: string): Promise<boolean> {
-    return this.copilotRoutines.delete(identity, id);
-  }
-
-  runCopilotRoutineJobsOnce(limit = 10): Promise<CopilotRoutineRunSummary> {
-    if (!this.copilotRoutineExecutor) {
-      return Promise.resolve({ claimed: 0, completed: 0, failed: 0 });
-    }
-    return this.copilotRoutineRunner.runRoutineJobsOnce(limit);
-  }
-
-  /** Bind the application runtime's copilot without a Kernel import cycle. */
-  attachChannelCopilotExecutor(executor: ChannelCopilotExecutor): void {
-    this.channelCopilotExecutor = executor;
-  }
-
-  runChannelJobsOnce(limit = 10): Promise<ChannelRunSummary> {
-    if (!this.channelCopilotExecutor) {
-      return Promise.resolve({ claimed: 0, completed: 0, failed: 0 });
-    }
-    return this.channelRunner.runChannelJobsOnce(limit);
-  }
-
-  /**
-   * C0 channel ingress. `kind` and `routeKey` come from the URL path; both
-   * are opaque and resolve server-side (D9). Every deny path is a uniform 404.
-   */
-  async acceptChannelIngress(
-    kind: string,
-    routeKey: string,
-    raw: RawChannelRequest,
-  ): Promise<ChannelIngressResult> {
-    let parsedKind: ExecutableChannelKind;
-    try {
-      parsedKind = parseExecutableChannelKind(kind);
-    } catch {
-      return { status: 404, body: null, contentType: null };
-    }
-    return this.channels.ingress.accept(parsedKind, routeKey, raw);
-  }
-
-  /**
-   * M9 #21 (E39): tenant-root credit summary for the console usage screen.
-   * Namespace is the server-resolved session namespace, never a query param.
-   */
-  creditSummary(identity: Identity, limit?: number): Promise<CreditSummary> {
-    return creditSummary(this.db, identity.namespace, { limit });
-  }
-
-  /**
-   * M9 #1 (E1): GitHub App webhook ingress. The HMAC is the credential — an
-   * invalid signature is a 401 (audited denied); a verified event fans out to
-   * durable `source-sync` jobs for every registered github source covering the
-   * event repository. D9: namespace comes from the source row, never the
-   * payload. D4: ok/denied/error each leave an audit row.
-   */
-  async handleGitHubWebhook(
-    rawBody: string,
-    signature: string | undefined,
-    event: string | undefined,
-  ): Promise<{ accepted: true; matched: number }> {
-    const auditRow = async (
-      result: "ok" | "denied" | "error",
-      detail: string,
-      namespace: Namespace = "unknown",
-    ): Promise<void> => {
-      try {
-        await this.audit.append({
-          ts: new Date().toISOString(),
-          actor: "webhook:github",
-          agentId: "github-webhook",
-          op: "write",
-          memoryId: null,
-          namespace,
-          purpose: null,
-          result,
-          detail,
-        });
-      } catch {
-        // Audit-sink failure must not mask the webhook outcome.
-      }
-    };
-    const secret = process.env.HALOMEM_GITHUB_WEBHOOK_SECRET;
-    if (!secret || !verifyGitHubWebhookSignature(secret, rawBody, signature)) {
-      await auditRow("denied", "github_webhook invalid signature");
-      throw new WebhookAuthorizationError("invalid webhook signature");
-    }
-    if (!event || !GITHUB_SYNC_EVENTS.includes(event)) {
-      await auditRow("ok", `github_webhook ignored event=${event ?? "none"}`);
-      return { accepted: true, matched: 0 };
-    }
-    const repository = parseGitHubWebhookRepository(rawBody);
-    if (!repository) {
-      await auditRow("ok", "github_webhook no repository coordinates");
-      return { accepted: true, matched: 0 };
-    }
-    const jobs = new DurableJobStore(this.db);
-    let matched = 0;
-    try {
-      const rows = await this.sources.list("", true);
-      for (const row of rows) {
-        if (row.kind !== "github" || row.lifecycleState !== "active") continue;
-        // The registry list omits config — resolve the sealed config per
-        // candidate to match the repo allowlist (E55: legacy owner/repo is a
-        // one-entry allowlist; `repos[]` sources match any allowlisted repo).
-        // Never logged (E2 discipline).
-        const source = await this.sources.get(row.id);
-        if (!source) continue;
-        if (!githubSourceCoversRepo(source.config, repository)) continue;
-        const at = new Date().toISOString();
-        await jobs.enqueue({
-          id: `source-sync:${source.id}:webhook:${at}`,
-          kind: "source-sync",
-          namespace: source.namespace,
-          payload: { sourceId: source.id },
-          availableAt: at,
-        });
-        await auditRow(
-          "ok",
-          `github_webhook event=${event} source=${source.id}`,
-          source.namespace,
-        );
-        matched++;
-      }
-    } catch (err) {
-      await auditRow(
-        "error",
-        `github_webhook ${err instanceof Error ? err.name : "error"}`,
-      );
-      throw err;
-    }
-    if (matched === 0) {
-      await auditRow("ok", `github_webhook event=${event} matched=0`);
-    }
-    return { accepted: true, matched };
-  }
-
-  /** M9 #1: GitHub App installation admin surface (summaries only, E2). */
-  listGitHubInstallations(identity: Identity): Promise<GitHubInstallationSummary[]> {
-    return this.githubApp.listInstallations(identity);
   }
 
   /** S3 people roster (human users ∪ agent badges) for the caller's subtree. */
@@ -10527,7 +7532,7 @@ export class Kernel {
     identity: Identity,
     input: ConflictScanRequest,
   ): Promise<ConflictScanRunView> {
-    await this.consumeEarlyAccess(identity, "conflict_scan", "write", "conflict-scan");
+    await this.consumeQuota(identity, "conflict_scan", "write", "conflict-scan");
     const targetNamespace = input.targetTeamId
       ? await consoleResolveTeamNamespace(this.consoleSlice(identity), identity, input.targetTeamId)
       : identity.namespace;
@@ -10903,33 +7908,6 @@ export class Kernel {
   }
 
   /**
-   * M9 W3 (E56): S2 usage read — effective/own cap, month-to-date spend,
-   * tenant-root credit balance, month-to-date debits, alert configs. The
-   * service audits denied reads (D4) and resolves targets inside the caller's
-   * subtree only (D9).
-   */
-  async usageSummary(identity: Identity): Promise<UsageSummary & { earlyAccess: EarlyAccessSummary }> {
-    const [summary, earlyAccess] = await Promise.all([
-      this.usageCaps.usageSummary(identity),
-      this.earlyAccess.summary(identity),
-    ]);
-    return { ...summary, earlyAccess };
-  }
-
-  /** M9 W3 (E56): customer-editable monthly cap; every attempt audited. */
-  setUsageCap(identity: Identity, input: SetCapInput): Promise<SetCapResult> {
-    return this.usageCaps.setMonthlyCap(identity, input);
-  }
-
-  /** M9 W3 (E53): customer-editable alert thresholds; upserts audited in-tx. */
-  upsertUsageAlert(
-    identity: Identity,
-    input: UsageAlertUpsertInput,
-  ): Promise<UsageAlertConfigView> {
-    return this.usageAlerts.upsert(identity, input);
-  }
-
-  /**
    * D28 boundary rule 4: the export egress lane runs the SAME per-syscall
    * gate as every read syscall — credential-active re-check, tenant
    * suspension, and the caller's token bucket — before any governance
@@ -10965,7 +7943,7 @@ export class Kernel {
     }
     const policy = await this.policyStore.getFresh(identity.namespace);
     const namespaceLimit = policy.rateLimitPerMin ?? DEFAULT_RATE_LIMIT_PER_MIN;
-    const limit = earlyAccessRateLimitPerMin(
+    const limit = this.quota.rateLimitPerMin(
       effectiveRateLimit(namespaceLimit, tenant) ?? namespaceLimit,
       identity.actor,
     );
@@ -10991,7 +7969,7 @@ export class Kernel {
   ): Promise<ExportResult> {
     await this.gateExport(identity);
     await this.requireOAuthTool(identity, "mem_export");
-    await this.consumeEarlyAccess(identity, "export", "export", "mem-export");
+    await this.consumeQuota(identity, "export", "export", "mem-export");
     // A SCOPED export from the `""` organization root needs its downward
     // read authority resolved HERE (the module has no db): prefixes [""]
     // minus the registered tenants (Amendment A1) — the same reach the
@@ -11019,10 +7997,10 @@ export class Kernel {
       // no credit was charged for a caller who can never export.
       return memExport(exporterDeps, identity, options);
     }
-    const charge = await this.creditMeter.charge(identity, "export_run", {
+    const charge = await this.meter?.charge(identity, "export_run", {
       reason: "mem-export",
     });
-    if (!charge.ok && charge.state !== "error") {
+    if (charge && !charge.ok && charge.state !== "error") {
       // empty-credits (or budget-over): degrade the lane — audited refusal.
       // state 'error' means the billing store itself is down: fail OPEN
       // (a billing outage must not disable governance-approved egress).
@@ -11037,7 +8015,11 @@ export class Kernel {
         result: "denied",
         detail: `export refused: ${charge.state} (feature=export_run)`,
       });
-      throw new CreditExhaustedError("export_run");
+      throw new QuotaLimitError(
+        "credit_exhausted",
+        "organization credit balance is exhausted (feature=export_run)",
+        "export",
+      );
     }
     return memExport(
       exporterDeps,
@@ -11165,7 +8147,7 @@ export class Kernel {
   async memSearch(args: MemSearchArgs, identity: Identity, agentId = DEFAULT_AGENT_ID, ctx?: SyscallContext): Promise<ScoredRef[]> {
     await this.requireOAuthTool(identity, "mem_search");
     await this.requireAgentOperation("search", identity, ctx);
-    await this.consumeEarlyAccess(identity, "retrieval", "search", "mem-search");
+    await this.consumeQuota(identity, "retrieval", "search", "mem-search");
     const governedArgs = identity.role === "agent" ? { ...args, live: "off" as const } : args;
     return this.withTeamMemoryRead(identity, (effectiveIdentity) =>
       this.withUsageContext(identity, ctx, (resolved) =>
@@ -11303,14 +8285,8 @@ export class Kernel {
       syncStatus: source.syncStatus,
       lifecycleState: source.lifecycleState,
       lastSync: source.lastSync,
-      liveSearchSupported: this.sourceSupportsLiveSearch(source.id, source.kind as SourceKind),
+      liveSearchSupported: false,
     }));
-  }
-
-  private sourceSupportsLiveSearch(sourceId: string, kind: SourceKind): boolean {
-    const connector = this.liveConnectors.get(sourceId) ?? this.buildLiveConnector(kind, {});
-    return connector !== null && typeof connector === "object" &&
-      typeof (connector as { liveQuery?: unknown }).liveQuery === "function";
   }
 
   /**
@@ -11339,9 +8315,9 @@ export class Kernel {
     throw new AuthzError("this agent has read-only access to memory");
   }
 
-  async consumeEarlyAccess(
+  async consumeQuota(
     identity: Identity,
-    feature: EarlyAccessFeature,
+    feature: QuotaFeature,
     op: AuditOp,
     purpose: string,
     options: {
@@ -11352,15 +8328,15 @@ export class Kernel {
     } = {},
   ): Promise<void> {
     try {
-      await this.earlyAccess.consume(identity, feature, {
+      await this.quota.consume(identity, feature, {
         idempotencyKey: options.idempotencyKey ?? `${purpose}:${ulid()}`,
         ...(options.units === undefined ? {} : { units: options.units }),
         ...(options.enrollSeat === undefined ? {} : { enrollSeat: options.enrollSeat }),
         ...(options.reservedUsd === undefined ? {} : { reservedUsd: options.reservedUsd }),
       });
     } catch (error) {
-      if (error instanceof EarlyAccessLimitError) {
-        await this.auditEarlyAccessDenial(identity, op, purpose, {
+      if (error instanceof QuotaLimitError) {
+        await this.auditQuotaDenial(identity, op, purpose, {
           code: error.code,
           feature: error.feature,
           limit: error.limit,
@@ -11372,21 +8348,21 @@ export class Kernel {
 
   /** Debit several allowances in one guard transaction (all-or-nothing),
    * auditing a denial exactly like the single-feature path. */
-  async consumeEarlyAccessMany(
+  async consumeQuotaMany(
     identity: Identity,
-    items: EarlyAccessConsumeItem[],
+    items: QuotaConsumeItem[],
     op: AuditOp,
     purpose: string,
     options: { idempotencyKey?: string; enrollSeat?: boolean } = {},
   ): Promise<void> {
     try {
-      await this.earlyAccess.consumeMany(identity, items, {
+      await this.quota.consumeMany(identity, items, {
         idempotencyKey: options.idempotencyKey ?? `${purpose}:${ulid()}`,
         ...(options.enrollSeat === undefined ? {} : { enrollSeat: options.enrollSeat }),
       });
     } catch (error) {
-      if (error instanceof EarlyAccessLimitError) {
-        await this.auditEarlyAccessDenial(identity, op, purpose, {
+      if (error instanceof QuotaLimitError) {
+        await this.auditQuotaDenial(identity, op, purpose, {
           code: error.code,
           feature: error.feature,
           limit: error.limit,
@@ -11396,11 +8372,11 @@ export class Kernel {
     }
   }
 
-  async auditEarlyAccessDenial(
+  async auditQuotaDenial(
     identity: Identity,
     op: AuditOp,
     purpose: string,
-    denial: { code: string; feature?: EarlyAccessFeature | null; limit?: number | null },
+    denial: { code: string; feature?: QuotaFeature | null; limit?: number | null },
   ): Promise<void> {
     await this.audit.append({
       ts: new Date().toISOString(),
@@ -11412,7 +8388,7 @@ export class Kernel {
       purpose,
       result: "denied",
       detail: JSON.stringify({
-        boundary: "early-access",
+        boundary: "quota",
         code: denial.code,
         feature: denial.feature ?? null,
         limit: denial.limit ?? null,
@@ -11424,7 +8400,7 @@ export class Kernel {
     await this.requireOAuthTool(identity, "mem_write");
     await this.requireAgentWrite(identity, "write");
     await this.requireAgentOperation("write", identity, ctx);
-    await this.consumeEarlyAccess(identity, "memory_write", "write", "mem-write");
+    await this.consumeQuota(identity, "memory_write", "write", "mem-write");
     // D38: ctx only scopes cost attribution for the SYNC write path's
     // extraction/embedding calls. The async WriteQueue worker runs outside
     // this window (a background lane) and stays namespace-only (E5).
@@ -11440,7 +8416,7 @@ export class Kernel {
   async memFault(args: MemFaultArgs, identity: Identity, agentId = DEFAULT_AGENT_ID, ctx?: SyscallContext): Promise<MemFaultResult> {
     await this.requireOAuthTool(identity, "mem_fault");
     await this.requireAgentOperation("fault", identity, ctx);
-    await this.consumeEarlyAccess(identity, "retrieval", "fault", "mem-fault");
+    await this.consumeQuota(identity, "retrieval", "fault", "mem-fault");
     if (identity.role !== "agent" || identity.channelAssistant === true) {
       return this.withTeamMemoryRead(identity, (effectiveIdentity) =>
         this.withUsageContext(identity, ctx, (resolved) =>
@@ -11464,81 +8440,10 @@ export class Kernel {
         )));
   }
 
-  /** M6 (D15): redeem a phase-2 live-confirmation ticket minted by mem_fault. */
-  async memLiveResult(
-    args: MemLiveResultArgs,
-    identity: Identity,
-    agentId = DEFAULT_AGENT_ID,
-    ctx?: SyscallContext,
-  ): Promise<MemLiveResultResult> {
-    if (identity.role === "agent" && identity.channelAssistant !== true) {
-      const ts = new Date().toISOString();
-      const auditSeq = await this.audit.appendWithSeq({
-        ts,
-        actor: identity.actor,
-        agentId: identity.keyId,
-        op: "fault",
-        memoryId: null,
-        namespace: identity.namespace,
-        purpose: null,
-        result: "denied",
-        detail: "legacy live-result denied: use badge-bound source_read",
-      });
-      await this.recordFacadeDenialUsage(identity, ctx, auditSeq, ts, "fault");
-      throw new AuthzError("live backend access requires source_read");
-    }
-    if (identity.channelAssistant === true) {
-      if (!ctx?.channelAuthority) {
-        await this.l4Audit({
-          connectorId: "authority",
-          outcome: "denied",
-          latencyMs: 0,
-          reason: "channel_authority_missing",
-        }, identity, agentId);
-        throw new AuthzError("channel live-result authority is missing");
-      }
-      // Publication fence: a grant revoked after provider completion but
-      // before ticket redemption must still prevent the result from leaving
-      // HaloMem.
-      await this.assertChannelLiveAuthority(identity, ctx.channelAuthority, agentId);
-    }
-    return memLiveResult(this.deps, args, identity, this.syscallAgentId(identity, agentId), ctx);
-  }
-
-  /**
-   * Application-runtime seam: wait for the durable worker that owns this live
-   * job, then redeem through the normal identity-fenced, audited syscall.
-   */
-  async awaitMemLiveResult(
-    args: MemLiveResultArgs,
-    identity: Identity,
-    agentId = DEFAULT_AGENT_ID,
-    ctx?: SyscallContext,
-  ): Promise<MemLiveResultResult> {
-    let ticket = await this.durableTickets.resolve<LiveResult>(args.ticket, identity);
-    if (!ticket) {
-      return ctx === undefined
-        ? this.memLiveResult(args, identity, agentId)
-        : this.memLiveResult(args, identity, agentId, ctx);
-    }
-    const deadline = Date.parse(ticket.expiresAt);
-    while (ticket.state === "running" && Date.now() < deadline) {
-      void this.kickLiveJobs().catch(() => undefined);
-      const remainingMs = deadline - Date.now();
-      if (remainingMs <= 0) break;
-      await new Promise((resolve) => setTimeout(resolve, Math.min(50, remainingMs)));
-      ticket = await this.durableTickets.resolve<LiveResult>(args.ticket, identity);
-      if (!ticket) break;
-    }
-    return ctx === undefined
-      ? this.memLiveResult(args, identity, agentId)
-      : this.memLiveResult(args, identity, agentId, ctx);
-  }
-
   async memAssemble(args: MemAssembleArgs, identity: Identity, agentId = DEFAULT_AGENT_ID, ctx?: SyscallContext): Promise<WorkingSet> {
     await this.requireOAuthTool(identity, "mem_assemble");
     await this.requireAgentOperation("assemble", identity, ctx);
-    await this.consumeEarlyAccess(identity, "retrieval", "assemble", "mem-assemble");
+    await this.consumeQuota(identity, "retrieval", "assemble", "mem-assemble");
     return this.withTeamMemoryRead(identity, (effectiveIdentity) =>
       this.withUsageContext(identity, ctx, (resolved) =>
         memAssemble(
@@ -12086,9 +8991,6 @@ export class Kernel {
   }
 
   async close(): Promise<void> {
-    this.cacheKeeper.stop();
-    this.discordGateway?.stop();
-    clearInterval(this.liveJobPoller);
     clearInterval(this.connectorJobPoller);
     clearInterval(this.conflictScanJobPoller);
     clearInterval(this.conflictAutopilotPoller);
@@ -12096,7 +8998,6 @@ export class Kernel {
     clearInterval(this.embeddingBackfillPoller);
     clearInterval(this.memoryTitlePoller);
     await this.writeQueue.drain();
-    if (this.liveWorker) await this.liveWorker;
     if (this.conflictScanWorker) await this.conflictScanWorker;
     if (this.conflictAutopilotWorker) await this.conflictAutopilotWorker;
     if (this.entityTagWorker) await this.entityTagWorker;

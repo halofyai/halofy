@@ -22,11 +22,10 @@ describe("console UX audit report regressions", () => {
   });
 
   it("keeps the memory graph spatial and standardizes filter controls on mobile", async () => {
-    const [css, topology, conflicts, usage] = await Promise.all([
+    const [css, topology, conflicts] = await Promise.all([
       consoleFile("app.css"),
       consoleFile("screens/s5-topology.js"),
       consoleFile("screens/s11.js"),
-      consoleFile("screens/s15.js"),
     ]);
     // The plane grows with its row (a long inspector makes the row taller) but
     // never collapses below the authored composition, which stays 800px and
@@ -39,7 +38,6 @@ describe("console UX audit report regressions", () => {
     expect(css).not.toMatch(/\.memory-graph-node\{position:static/s);
     expect(topology).toContain("filter-strip filter-strip--scroll");
     expect(conflicts).toContain('class="filter-strip"');
-    expect(usage).toContain('acts: \'<div class="filter-strip">\'');
   });
 
   it("keeps connected sources first and the catalog secondary", async () => {
@@ -70,14 +68,11 @@ describe("console UX audit report regressions", () => {
     expect(app).toContain('priority = "secondary"');
   });
 
-  it("keeps setup, assistant, model, usage, and audit empty/detail states actionable", async () => {
-    const [setup, home, audit, copilot, models, usage] = await Promise.all([
+  it("keeps setup, home, and audit empty/detail states actionable", async () => {
+    const [setup, home, audit] = await Promise.all([
       consoleFile("screens/s1.js"),
       consoleFile("screens/s2.js"),
       consoleFile("screens/s8.js"),
-      consoleFile("screens/s10.js"),
-      consoleFile("screens/s12.js"),
-      consoleFile("screens/s15.js"),
     ]);
     expect(setup).not.toContain("Not started");
     const wizard = setup.slice(setup.indexOf("function wizardPanel"), setup.indexOf("function sourceStep"));
@@ -91,10 +86,5 @@ describe("console UX audit report regressions", () => {
     expect(audit).toContain("formatTimestamp");
     expect(audit).toContain('data-action="audit-copy"');
     expect(await consoleFile("app.css")).toMatch(/\.audit-result\{[^}]*white-space:normal;[^}]*overflow-wrap:anywhere/s);
-    expect(copilot).toContain('data-action="copilot-open-models"');
-    expect(models).toContain('data-action="model-open-setup"');
-    expect(models).toContain('class="card model-empty"');
-    expect(usage).toContain("/v1/admin/usage/rollup?days=");
-    expect(usage).toContain("/v1/admin/usage/queries");
   });
 });

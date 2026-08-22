@@ -14,7 +14,7 @@ const INDEX = readFileSync(
   fileURLToPath(new URL("../console/index.html", import.meta.url)),
   "utf8",
 );
-const ACCESSIBLE_SCREENS = ["s6.js", "s10.js"]
+const ACCESSIBLE_SCREENS = ["s6.js", "s14.js"]
   .map((name) =>
     readFileSync(
       fileURLToPath(new URL(`../console/screens/${name}`, import.meta.url)),
@@ -40,7 +40,7 @@ function cssRule(selector: string): string {
 
 describe("console minimalist UI contract", () => {
   it("declares an existing local favicon so clean page loads do not request /favicon.ico", () => {
-    expect(INDEX).toContain('<link rel="icon" href="assets/marks/halofy-mark-green.png" />');
+    expect(INDEX).toContain('<link rel="icon" href="assets/marks/halofy-mark-green.svg" type="image/svg+xml" />');
   });
   it("carries the canonical Halofy color, spacing, elevation, and type tokens", () => {
     expect(cssToken("evergreen-rgb")).toMatch(/^18\s+58\s+46$/);
@@ -83,7 +83,7 @@ describe("console minimalist UI contract", () => {
   });
 
   it("uses metallic black shell chrome and keeps primary buttons flat", () => {
-    expect(INDEX).toContain('class="mark" src="assets/marks/halofy-mark-white.png"');
+    expect(INDEX).toContain('class="mark" src="assets/marks/halofy-mark-white.svg"');
     expect(cssRule(".brand .mark")).not.toContain("filter");
     expect(cssToken("dl-rail")).toBe("#050607");
     expect(cssToken("dl-rail-metal")).toContain("radial-gradient");

@@ -320,7 +320,7 @@ describe("static console - served publicly with correct content-types", () => {
   });
 
   it("every screen module GET /console/screens/s<N>.js is 200 JavaScript with a render export", async () => {
-    for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
+    for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 13, 14, 16, 17, 18, 19, 20]) {
       const res = await req("GET", `/console/screens/s${n}.js`);
       expect(res.status, `s${n}.js status`).toBe(200);
       expect(res.contentType, `s${n}.js content-type`).toMatch(/(text|application)\/javascript/);

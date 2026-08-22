@@ -200,7 +200,7 @@ describe("truthful backend payloads", () => {
       auth: {}, metrics: {}, audit: {},
       // The early-access allowance gate runs before the manual pass; an
       // ungated stub lets the test stay about input validation.
-      async consumeEarlyAccess() {},
+      async consumeQuota() {},
       consolidation: {
         async runManual() {
           throw new Error("evidence selection is invalid for this exact scope");

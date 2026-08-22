@@ -27,16 +27,14 @@ describe("HaloMem Sync Obsidian plugin package", () => {
 
   it("is installed, typechecked, and built by the backend static-quality lane", async () => {
     const workflow = (await readFile(
-      new URL("../../.github/workflows/kernel-ci.yml", import.meta.url),
+      new URL("../../.github/workflows/ci.yml", import.meta.url),
       "utf8",
     )).replace(/\r\n/g, "\n");
 
-    expect(workflow).toMatch(
-      /cache-dependency-path: \|\n\s+kernel\/package-lock\.json\n\s+kernel\/integrations\/halomem-sync\/package-lock\.json/,
-    );
-    expect(workflow).toContain("name: Install Obsidian plugin dependencies");
-    expect(workflow).toContain("name: Typecheck Obsidian plugin");
-    expect(workflow).toContain("name: Build Obsidian plugin");
+    expect(workflow).toContain("cache-dependency-path: kernel/integrations/halomem-sync/package-lock.json");
+    expect(workflow).toContain("name: Install");
+    expect(workflow).toContain("name: Typecheck");
+    expect(workflow).toContain("name: Build is reproducible");
     expect(workflow.match(/working-directory: kernel\/integrations\/halomem-sync/g)).toHaveLength(3);
   });
 });

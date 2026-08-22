@@ -61,7 +61,6 @@ what the open build does not include, so nothing is a surprise later.
 | `kernel/test/` | The hermetic test suite: in-memory PGlite, stub LLM, hash embedder, no network. |
 | `kernel/console/` | The frameworkless control room UI. |
 | `docs/security/threat-model.md` | Assets, boundaries, adversaries, and the controls that stop each — including the ones that are only partial. |
-| `docs/scoped-access.md` | The namespace ACL for security reviewers: the rule, the query-layer code that enforces it, the `LIKE` hazard, tenants, governed exceptions, the driver boundary, and the adversarial suite with its real output. |
 | `docs/commercial/open-vs-managed.md` | Capability-by-capability: what the open build does, and what Halofy sells on top. |
 | `docs/adr/` | Architecture decision records. |
 | `CONTRIBUTING.md` | How to propose and land a change. |

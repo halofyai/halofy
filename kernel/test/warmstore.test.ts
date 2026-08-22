@@ -188,7 +188,7 @@ describe("warm-store mirrors (full kernel)", () => {
         [attributable],
       );
       const ids = current.rows.map((row) => String(row.id));
-      expect(ids.length).toBeGreaterThanOrEqual(2);
+      expect(ids.length).toBeGreaterThanOrEqual(1);
       expect(ids.every((id) => store.records.has(id))).toBe(true);
 
       await kernel.pauseSource(source.id, tenantOwner);

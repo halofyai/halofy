@@ -286,7 +286,7 @@ function renderPublicPage(
     `<title>${escapeHtml(orgName)} - public memory</title>` +
     `<style>${PAGE_CSS}</style></head><body><main>` +
     `<div class="mast">` +
-    `<img src="/console/assets/marks/halofy-mark-green.png" alt="" aria-hidden="true">` +
+    `<img src="/console/assets/marks/halofy-mark-green.svg" alt="" aria-hidden="true">` +
     `<div><b>Halofy</b><small>Halo Mem</small></div></div>` +
     `<h1>${escapeHtml(orgName)}</h1>` +
     `<p class="meta">Public memory index · ${rows.length} entries · generated ${escapeHtml(generatedAt.slice(0, 10))} · ` +

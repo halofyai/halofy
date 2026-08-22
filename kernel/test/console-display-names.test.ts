@@ -65,10 +65,8 @@ describe("shared console organization labels", () => {
       "screens/s6.js",
       "screens/s8.js",
       "screens/s9.js",
-      "screens/s12.js",
       "screens/s13.js",
       "screens/s14.js",
-      "screens/s15.js",
       "screens/s18.js",
       "screens/s20.js",
     ];
@@ -277,7 +275,6 @@ describe("shared console person labels", () => {
       "screens/s8.js",
       "screens/s11.js",
       "screens/s13.js",
-      "screens/s15.js",
       "screens/s16.js",
       "screens/s17.js",
       "screens/s20.js",
@@ -296,7 +293,6 @@ describe("shared console person labels", () => {
       "screens/s6.js",
       "screens/s8.js",
       "screens/s13.js",
-      "screens/s15.js",
       "screens/s16.js",
     ];
     for (const relative of files) {

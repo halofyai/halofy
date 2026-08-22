@@ -108,7 +108,7 @@ describe("D29 OAuth authorization server is live", () => {
     ).resolves.toBeDefined();
   });
 
-  it("fences the billable copilot lane and the answer-outcome governance write (E27)", async () => {
+  it("fences the answer-outcome governance write (E27)", async () => {
     const { record, clientSecret } = await kernel.oauthClients.create(
       { name: "narrow-bot", tokenRole: "assistant", allowedTools: ["mem_search"] },
       owner,
@@ -123,23 +123,6 @@ describe("D29 OAuth authorization server is live", () => {
     });
     const identity = await kernel.resolveOAuthIdentity(issued.body.access_token as string);
     expect(identity).not.toBeNull();
-
-    // Billable copilot lane (message_out debit): refused BEFORE any credit is
-    // charged or the LLM runtime is touched — 'copilot_complete' not granted.
-    const before = await kernel.db.query(
-      `SELECT COUNT(*) AS n FROM credit_ledger WHERE reason = 'copilot-message'`,
-    );
-    await expect(
-      deps.copilot!.complete({
-        message: "hi",
-        conversationId: "01H00000000000000000000000",
-        turnId: "oauth-fence-turn",
-      }, identity!),
-    ).rejects.toThrow(AuthzError);
-    const after = await kernel.db.query(
-      `SELECT COUNT(*) AS n FROM credit_ledger WHERE reason = 'copilot-message'`,
-    );
-    expect(Number(after.rows[0].n)).toBe(Number(before.rows[0].n));
 
     // D31 governance write: refused before any answer_outcomes row lands —
     // 'answer_outcome' not granted (and an empty list grants NO tools).

@@ -565,9 +565,8 @@ describe("M3 exit (e) - D10 static import guard", () => {
         }
       }
     }
-    // Guard the guard: make sure we actually read files (a bad glob = false
-    // pass). The recursive walk covers 80+ files today; a floor of 20 still
-    // fails fast if recursion regresses to a flat listing.
-    expect(scanned).toBeGreaterThanOrEqual(20);
+    // Guard the guard: the public build deliberately excludes the commercial
+    // connector catalog, but a bad recursive walk must still fail loudly.
+    expect(scanned).toBeGreaterThanOrEqual(8);
   });
 });
