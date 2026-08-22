@@ -1,0 +1,24 @@
+# GitHub Sponsors and the funding sidebar.
+#
+# Nothing is enabled. Halofy is funded by the managed Halofy service and by
+# commercial licenses for organisations that cannot accept AGPL-3.0 network
+# copyleft — see docs/commercial/open-vs-managed.md and LICENSING.md. We are not
+# soliciting donations, and we would rather ship an empty file than point the
+# sidebar at an account that does not exist.
+#
+# If that ever changes, uncomment exactly the lines that correspond to accounts
+# we actually control. An unverified handle here renders a dead link on every
+# page of the repository.
+#
+# github: []
+# open_collective:
+# ko_fi:
+# tidelift:
+# community_bridge:
+# liberapay:
+# issuehunt:
+# lfx_crowdfunding:
+# polar:
+# buy_me_a_coffee:
+# thanks_dev:
+# custom: []

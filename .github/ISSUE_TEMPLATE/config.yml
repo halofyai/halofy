@@ -1,0 +1,23 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/halofyai/halofy/security/advisories/new
+    about: >-
+      Do not open a public issue for a security problem. Use GitHub Private
+      Vulnerability Reporting, or email security@halofy.ai. See SECURITY.md for
+      scope, acknowledgement targets and safe harbour.
+  - name: Question or usage help
+    url: https://github.com/halofyai/halofy/discussions/categories/q-a
+    about: >-
+      Ask in Discussions. Issues are for reproducible bugs and accepted work,
+      not for support. Self-hosted deployments are community supported.
+  - name: Idea or design discussion
+    url: https://github.com/halofyai/halofy/discussions/categories/ideas
+    about: >-
+      Open-ended proposals belong in Discussions first. Use the feature request
+      form only once the shape of the change is clear.
+  - name: Licensing, CLA or commercial use
+    url: mailto:licensing@halofy.ai
+    about: >-
+      AGPL-3.0 network copyleft questions, the Apache-2.0 subtrees, the CLA, or
+      a commercial license. See LICENSING.md and CLA.md.

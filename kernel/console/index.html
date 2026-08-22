@@ -1,0 +1,260 @@
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Halofy</title>
+<link rel="icon" href="assets/marks/halofy-mark-green.png" />
+<link rel="stylesheet" href="app.css?v=20260821-1" />
+
+<div class="app">
+  <header class="mobile-topbar" id="mobile-topbar">
+    <div class="mobile-brand" aria-label="Halofy">
+      <button class="brand-home" data-brand-home type="button" aria-label="Halofy - go to Home">
+        <img src="assets/marks/halofy-mark-green.png" alt="" aria-hidden="true" />
+      </button>
+    </div>
+    <button
+      class="mobile-search"
+      data-cmdk-open
+      type="button"
+      aria-label="Search (opens the command palette)"
+      hidden
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-4-4" stroke-linecap="round" />
+      </svg>
+    </button>
+    <button
+      class="mobile-nav-toggle"
+      id="mobile-nav-toggle"
+      type="button"
+      aria-label="Open navigation"
+      aria-controls="app-rail"
+      aria-expanded="false"
+    >
+      <span>Menu</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round" />
+      </svg>
+    </button>
+  </header>
+
+  <button
+    class="mobile-nav-backdrop"
+    id="mobile-nav-backdrop"
+    type="button"
+    aria-label="Close navigation"
+    aria-hidden="true"
+    tabindex="-1"
+  ></button>
+
+  <aside class="rail" id="app-rail" aria-label="Halofy navigation">
+    <div class="brand">
+      <button
+        class="brand-home"
+        data-brand-home
+        type="button"
+        aria-label="Halofy - go to Home"
+        data-tip="Home"
+      >
+        <img class="mark" src="assets/marks/halofy-mark-white.png" alt="" aria-hidden="true" />
+      </button>
+      <button
+        class="rail-collapse halo-icon-control"
+        id="rail-collapse"
+        type="button"
+        aria-label="Collapse navigation"
+        aria-expanded="true"
+        data-tip="Expand navigation"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M14 6l-6 6 6 6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <button class="mobile-nav-close halo-icon-control" id="mobile-nav-close" type="button" aria-label="Return to content">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M14 6l-6 6 6 6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+    <nav id="rail-nav" aria-label="Primary"><!-- app.js injects the role-filtered nav groups --></nav>
+
+    <section class="rail-help" aria-labelledby="rail-help-title">
+      <div class="rail-help__copy">
+        <h2 id="rail-help-title">Need help?</h2>
+        <p>Find answers or talk to us.</p>
+      </div>
+      <div class="rail-help__links">
+        <a
+          class="rail-help__action"
+          href="https://halofy.ai/usecases#general-faqs"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Documentation (opens in a new tab)"
+          data-tip="Documentation"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4.5 5.5A2.5 2.5 0 0 1 7 3h5v16H7a2.5 2.5 0 0 0-2.5 2z" stroke-linejoin="round" />
+            <path d="M19.5 5.5A2.5 2.5 0 0 0 17 3h-5v16h5a2.5 2.5 0 0 1 2.5 2z" stroke-linejoin="round" />
+          </svg>
+          <span>Documentation</span>
+          <svg class="rail-help__chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="m6 3 5 5-5 5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span class="sr-only"> (opens in a new tab)</span>
+        </a>
+        <a
+          class="rail-help__action"
+          href="https://github.com/halofyai/halofy/discussions"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Support (opens in a new tab)"
+          data-tip="Support"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 13v-1a8 8 0 0 1 16 0v1" stroke-linecap="round" />
+            <rect x="2" y="13" width="4" height="6" rx="1.5" />
+            <rect x="18" y="13" width="4" height="6" rx="1.5" />
+            <path d="M20 19v1a2 2 0 0 1-2 2h-4" stroke-linecap="round" />
+          </svg>
+          <span>Support</span>
+          <svg class="rail-help__chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="m6 3 5 5-5 5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span class="sr-only"> (opens in a new tab)</span>
+        </a>
+      </div>
+    </section>
+
+    <div class="railfoot">
+      <div class="av" id="rail-av">&nbsp;</div>
+      <div class="who"><span id="rail-who">-</span><small id="rail-role">-</small></div>
+      <button class="btn btn--ghost btn--sm" id="logout" data-logout data-tip="Sign out">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M15 8l4 4-4 4M19 12H9" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span>Sign out</span>
+      </button>
+    </div>
+  </aside>
+
+  <main class="stage" id="stage">
+    <header class="workspace-bar" aria-label="Workspace tools">
+      <div class="workspace-context">
+        <span class="workspace-org-mark" id="workspace-org-mark" aria-hidden="true"></span>
+        <span id="workspace-org-name">Organization root</span>
+      </div>
+      <button
+        class="workspace-search"
+        data-cmdk-open
+        type="button"
+        aria-label="Search (opens the command palette)"
+        hidden
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-4-4" stroke-linecap="round" />
+        </svg>
+        <span>Search across Halofy</span>
+        <kbd data-cmdk-hint>&#8984;K</kbd>
+      </button>
+      <div class="workspace-account" data-workspace-account>
+        <button
+          class="workspace-notification-trigger"
+          data-notification-trigger
+          type="button"
+          aria-label="Open notifications"
+          aria-haspopup="dialog"
+          aria-expanded="false"
+          aria-controls="workspace-notification-panel"
+          hidden
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span class="workspace-notification-count" data-notification-count hidden aria-hidden="true">0</span>
+        </button>
+        <button
+          class="workspace-account-trigger"
+          type="button"
+          aria-label="Open account menu"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="workspace-account-menu"
+        >
+          <span class="av" id="workspace-av" aria-hidden="true">&nbsp;</span>
+          <span class="workspace-account-copy" aria-hidden="true">
+            <span id="workspace-trigger-who">-</span>
+            <small id="workspace-trigger-role">-</small>
+          </span>
+        </button>
+        <div class="workspace-account-menu" id="workspace-account-menu" role="menu" hidden>
+          <div class="workspace-account-summary">
+            <span id="workspace-who">-</span>
+            <small id="workspace-role">-</small>
+          </div>
+          <button class="workspace-account-action" type="button" data-account-profile role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <circle cx="12" cy="8" r="3.5" />
+              <path d="M5.5 20a6.5 6.5 0 0 1 13 0" stroke-linecap="round" />
+            </svg>
+            <span>View profile</span>
+          </button>
+          <button class="workspace-account-action" type="button" data-logout role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M15 8l4 4-4 4M19 12H9" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span>Sign out</span>
+          </button>
+        </div>
+      </div>
+    </header>
+    <nav class="breadcrumbs" id="console-breadcrumbs" aria-label="Breadcrumb"></nav>
+    <div id="setup-gate-banner" class="setup-gate-banner" role="status" hidden></div>
+    <div id="screen-content" class="screen-flow">
+      <div class="page-loader" role="status" aria-live="polite" aria-busy="true">
+        <div class="page-skeleton" aria-hidden="true">
+          <div class="page-skeleton__head">
+            <span class="skel skel--eyebrow"></span>
+            <span class="skel skel--title"></span>
+            <span class="skel skel--sub"></span>
+          </div>
+          <div class="page-skeleton__stats">
+            <div class="page-skeleton__stat">
+              <span class="skel skel--stat-k"></span>
+              <span class="skel skel--stat-v"></span>
+            </div>
+            <div class="page-skeleton__stat">
+              <span class="skel skel--stat-k"></span>
+              <span class="skel skel--stat-v"></span>
+            </div>
+            <div class="page-skeleton__stat">
+              <span class="skel skel--stat-k"></span>
+              <span class="skel skel--stat-v"></span>
+            </div>
+          </div>
+          <div class="page-skeleton__card">
+            <span class="skel skel--card-title"></span>
+            <span class="skel skel--line"></span>
+            <span class="skel skel--line skel--line--80"></span>
+            <span class="skel skel--line skel--line--60"></span>
+          </div>
+        </div>
+        <span class="sr-only">Loading workspace</span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="notification-center"></div>
+
+<!-- The global assistant dock (assistant-dock.js) mounts here: a launcher
+     bubble in the bottom-right corner of every screen, and the panel it
+     opens. It sits outside .app so the router never repaints it and the
+     conversation survives navigation. -->
+<div class="assistant-dock" id="assistant-dock" hidden></div>
+
+<!-- The command palette (command-palette.js) mounts here. Like the dock it sits
+     outside .app so the router never repaints it, and it opens on Cmd+K (macOS)
+     or Ctrl+K everywhere else. -->
+<div class="cmdk" id="command-palette" hidden></div>
+
+<script type="module" src="app.js"></script>

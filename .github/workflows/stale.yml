@@ -1,0 +1,64 @@
+name: Stale
+
+# Deliberately narrow. This does NOT sweep the backlog: an open bug that nobody
+# has answered is our problem, not the reporter's, and auto-closing it would
+# only hide it. The only things this touches are threads that are waiting on
+# their author and have gone quiet.
+#
+# Nothing labelled `pinned`, `security`, `roadmap` or `help wanted` is ever
+# marked, and pull requests are never closed automatically.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/stale@v9
+        with:
+          operations-per-run: 100
+          ascending: true
+
+          # Only threads explicitly waiting on their author.
+          only-issue-labels: "waiting-for-author"
+          only-pr-labels: "waiting-for-author"
+
+          days-before-issue-stale: 21
+          days-before-issue-close: 14
+          stale-issue-label: "stale"
+          exempt-issue-labels: "pinned,security,roadmap,help wanted,good first issue,confirmed"
+          stale-issue-message: >
+            This issue has been waiting on more information from its author for
+            21 days. If the information in the template is still missing —
+            version and commit, Node version, whether you were on the zero-key
+            stub path or a real provider, PGlite or Postgres, and the relevant
+            audit or log excerpt — please add it and remove the `stale` label.
+
+
+            It will close in 14 days otherwise. Closing is not a judgement that
+            the bug is not real; reopen it or file a fresh issue the moment you
+            can reproduce it again.
+          close-issue-message: >
+            Closing because this has been waiting on its author for 35 days.
+            Please reopen with the missing details — we would rather have the
+            reproduction than the closed issue.
+
+          days-before-pr-stale: 30
+          days-before-pr-close: -1
+          stale-pr-label: "stale"
+          exempt-pr-labels: "pinned,security,do-not-merge"
+          exempt-draft-pr: true
+          stale-pr-message: >
+            This pull request has been waiting on its author for 30 days. It will
+            not be closed automatically — push a change or leave a comment when
+            you pick it up again, and a maintainer will take another look.

@@ -1,0 +1,237 @@
+name: CI
+
+# Public continuous integration for the Halofy kernel.
+#
+# Every lane that exercises the kernel does so with no credentials and no
+# provider or database network: in-memory PGlite, HashEmbedder, StubLlm. The
+# only network these jobs need is the npm registry (`npm ci`, `npm audit`) and
+# the Actions runner itself. No secret is read anywhere in this file.
+#
+# There are no deployment steps in this workflow and none should ever be added
+# to it — publishing is a separate, privately configured concern.
+
+on:
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    working-directory: kernel
+
+env:
+  # Keep every lane on the deterministic path even if a runner ever carries
+  # provider configuration. No lane in this workflow may reach the network.
+  ANTHROPIC_API_KEY: ""
+  OPENAI_API_KEY: ""
+  DATABASE_URL: ""
+
+jobs:
+  static-quality:
+    name: typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["22.x"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: kernel/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Console JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d console ]; then
+            find console -type f -name '*.js' -print0 | xargs -0 -r -n1 node --check
+          fi
+
+  test:
+    name: hermetic tests (shard ${{ matrix.shard }}/4, node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["22.x"]
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: kernel/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Run hermetic suite
+        run: npm test -- --shard=${{ matrix.shard }}/4
+
+  demo:
+    name: end-to-end story with no credentials
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["22.x"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: kernel/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Run the demo and assert the offline path
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run demo 2>&1 | tee demo.log
+
+          # The demo must have booted on the deterministic stub path, with no
+          # API key, no database and no model download. If either assertion
+          # fails the offline guarantee has regressed, whatever the exit code.
+          grep -F 'booted: embedder=hash(dim=256) llm=stub' demo.log
+          grep -F 'verifyCertificate === true' demo.log
+
+      - name: Upload demo transcript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-transcript
+          path: kernel/demo.log
+          if-no-files-found: warn
+          retention-days: 7
+
+  driver-conformance:
+    name: driver conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        driver: [baseline, graph]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+          cache-dependency-path: kernel/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # Retrieval is delegated (D1) and a driver is a read-only cartridge whose
+      # entire world is the ScopedView. The conformance kit enforces that import
+      # boundary mechanically rather than by review.
+      - name: Conformance for ${{ matrix.driver }}
+        run: npx tsx src/cli.ts conformance ${{ matrix.driver }}
+
+  supply-chain:
+    name: dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+          cache-dependency-path: kernel/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  integrations:
+    name: obsidian plugin
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+          cache-dependency-path: kernel/integrations/halomem-sync/package-lock.json
+
+      - name: Install
+        working-directory: kernel/integrations/halomem-sync
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: kernel/integrations/halomem-sync
+        run: npm run typecheck
+
+      - name: Build is reproducible
+        working-directory: kernel/integrations/halomem-sync
+        run: npm run build && git diff --exit-code -- main.js
+
+  ci:
+    # Single required status check. Branch protection points at this job so that
+    # adding or renaming a lane above never silently drops a gate.
+    name: ci
+    if: always()
+    needs:
+      - static-quality
+      - test
+      - demo
+      - driver-conformance
+      - supply-chain
+      - integrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every lane must have succeeded
+        working-directory: .
+        shell: bash
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "lane results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "A required lane did not succeed." >&2
+              exit 1
+            fi
+          done

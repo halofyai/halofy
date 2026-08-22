@@ -1,0 +1,6 @@
+{
+  "name": "halomem",
+  "description": "HaloMem organizational memory: session-start recall, session-end capture, MCP tools. Configure with HALOMEM_URL and HALOMEM_API_KEY.",
+  "version": "0.1.0",
+  "author": { "name": "HaloMem" }
+}

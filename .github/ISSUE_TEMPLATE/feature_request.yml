@@ -1,0 +1,102 @@
+name: Feature request
+description: Propose a concrete change once the shape of it is already clear.
+title: "feat: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Open-ended ideas belong in
+        [Discussions](https://github.com/halofyai/halofy/discussions/categories/ideas).
+        Use this form when you know what you want built and roughly where it goes.
+
+        Please read CONTRIBUTING.md section 2 first. Some areas are maintained
+        in-house and outside implementations of them are usually declined:
+        identity and sessions, ACL and tenancy, migrations, credential and token
+        encryption, policy evaluation, the audit path, and the write/retrieval
+        boundary. Proposals in those areas are still welcome — and a failing
+        regression test in one of them is the most useful thing you can send —
+        but the code has to come from a maintainer.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and discussions.
+          required: true
+        - label: >-
+            This does not require building a competitive retriever inside the kernel
+            (D1 — retrieval is delegated to driver cartridges, permanently).
+          required: true
+        - label: >-
+            This does not require the kernel to assemble prompts (D2 — the allocator
+            returns ranked blocks; the agent framework places them).
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What are you unable to do today? Describe the situation, not the solution.
+        Real usage beats hypotheticals.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: >-
+        What should exist. Name the surface it lands on and, if you can, the files —
+        for example a new syscall in kernel/src/syscalls, a console screen under
+        kernel/console/screens, or a driver in kernel/src/driver.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Write path / extraction / supersedence
+        - Retrieval drivers and the conformance kit
+        - Context allocator
+        - Storage tiers, movement, cold store
+        - Policy and governance (maintained in-house)
+        - Audit and erasure (maintained in-house)
+        - Auth, ACL, tenancy (maintained in-house)
+        - Migrations and schema (maintained in-house)
+        - HTTP API
+        - MCP surface
+        - Console
+        - Ingestion and importers
+        - Self-hosting, Docker, Kubernetes
+        - Documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Including doing nothing, or solving it outside the kernel.
+
+  - type: textarea
+    id: compat
+    attributes:
+      label: Compatibility and data impact
+      description: >-
+        Does this change the HTTP or MCP contract? Does it need a migration? New
+        tables must `ENABLE ROW LEVEL SECURITY`, and deployed migrations are never
+        rewritten. Does it add a denial path that must write an audit row (D4)?
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I am willing to implement this.
+        - label: I would need guidance on where it goes.

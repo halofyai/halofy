@@ -1,0 +1,10 @@
+{
+  "id": "halomem-sync",
+  "name": "HaloMem Sync",
+  "version": "0.1.0",
+  "minAppVersion": "1.11.4",
+  "description": "Send user-selected Markdown notes and link metadata to a paired HaloMem source.",
+  "author": "Halofy",
+  "authorUrl": "https://halofy.ai",
+  "isDesktopOnly": false
+}
