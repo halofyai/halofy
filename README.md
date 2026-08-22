@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>An open organizational-memory kernel for AI agent fleets.</strong><br />
-  Custody, access control, provenance, audit, and signed erasure—with retrieval delegated to swappable read-only drivers.
+  Custody, access control, provenance, audit, and signed erasure. Retrieval is delegated to swappable read-only drivers.
 </p>
 
 <p align="center">
@@ -49,7 +49,7 @@ kernel you can inspect, self-host, run offline, and connect over MCP or HTTP.
 - **A frameworkless control room:** memory, sources, policies, conflicts,
   retrieval quality, teams, audit, alerts, skills, connected apps, and export.
 - **Four public connectors:** filesystem, Postgres, Obsidian, and manual CSV
-  import—all feeding the same governed write path.
+  import. All feed the same governed write path.
 - **A hermetic test lane:** embedded PGlite, deterministic `StubLlm`,
   `HashEmbedder`, and zero network access.
 
@@ -125,7 +125,7 @@ schemas do not accept caller-asserted identity fields.
 ### The important boundaries
 
 1. **Identity is server-owned.** Namespace, actor, role, and source scope come
-   from the credential—not from a request body.
+   from the credential, never from a request body.
 2. **Writes have custody.** Corrections close the prior fact's validity interval
    and link the replacement. They do not overwrite history.
 3. **Reads are delegated.** A retriever sees only an ACL-scoped `ScopedView` and
@@ -183,7 +183,7 @@ The permanent boundary is documented in
 
 ### Deliberately commercial
 
-Halofy's managed operations—not memory custody—fund the open kernel:
+Halofy's managed operations, not memory custody, fund the open kernel:
 
 - model routing, spend attribution, and gateway observability;
 - billing, credit ledger, and hosted usage plans;
@@ -224,10 +224,10 @@ Security reports belong in the private channels described by
 ## License
 
 The kernel and console are **AGPL-3.0-or-later**. Named client and extension
-subtrees—including `kernel/src/driver/`, `kernel/src/mcp/`, and
-`kernel/integrations/`—are **Apache-2.0** so they can be embedded without
-relicensing the host application. See [LICENSING.md](LICENSING.md) and
-[NOTICE](NOTICE) for the authoritative file-by-file boundary.
+subtrees are **Apache-2.0** so they can be embedded without relicensing the
+host application. These include `kernel/src/driver/`, `kernel/src/mcp/`, and
+`kernel/integrations/`. See [LICENSING.md](LICENSING.md) and [NOTICE](NOTICE)
+for the authoritative file-by-file boundary.
 
 The Halofy name is a trademark; neither software licence grants trademark
 rights. See [TRADEMARK.md](TRADEMARK.md).
