@@ -16,12 +16,10 @@ foundation. That arrangement funds the open work. It also creates an obvious
 risk, and you are right to be suspicious of it: the vendor who gives you a
 capability can take it back in the next minor release.
 
-This is not hypothetical in this category. Mem0 removed graph memory from its
-open package in v2.0.0 and retired the local-first OpenMemory stack it had
-previously shipped. Other memory projects publish an open shell around a closed
-engine, or impose undocumented ceilings on the self-hosted build. Every one of
-those decisions was legal, and every one of them stranded people who had already
-built on the open version.
+That risk is structural, not theoretical. A vendor can narrow an open edition,
+move a capability behind a hosted service, or introduce limits after users have
+built around the original behaviour. A licence alone does not promise that
+future versions will preserve today's useful boundary.
 
 Storing an organization's memory is a decision with a long tail. You are
 choosing where facts about your company will live for years, under what access

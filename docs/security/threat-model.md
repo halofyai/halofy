@@ -459,6 +459,24 @@ API keys have no mandatory expiry, no rotation workflow, no device binding, and 
 the extent of it. Detection of a leaked key is entirely the operator's, from the
 audit trail.
 
+### 6.12 Launch disposition for partial controls
+
+The maintainers have reviewed the partial controls in this section and accept
+the following constraints for the 0.1 launch. This is a risk decision, not a
+claim that the controls are complete.
+
+- **CSRF:** the console relies on `SameSite=Lax`, current browsers, and the rule
+  that state-changing routes use POST or PUT. Operators must serve the console
+  from a dedicated trusted origin. A server-side `Origin` or CSRF-token check
+  remains planned hardening.
+- **Row-level security:** production Postgres must be reachable only by the
+  kernel and trusted administrators. An auto-generated REST interface such as
+  PostgREST must not be exposed over this schema until the older tables receive
+  RLS policies. This is a deployment precondition, not an optional suggestion.
+
+The other partial controls in this section remain visible so operators can make
+their own risk decisions and contributors can target hardening work.
+
 ---
 
 ## 7. Explicit non-goals

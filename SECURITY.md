@@ -235,21 +235,14 @@ finding lands.
 
 ### Awards
 
-**Discretionary at launch.** The ranges below are what we would aim to pay for an
-exceptional, fully-reproduced report in each tier — a ceiling we are working
-toward, not an entitlement. The decision, and the amount, is made case by case at
-triage and communicated in the triage verdict, so you never find out at the end.
-
-| Tier | Recognition | Monetary (discretionary) |
-|---|---|---|
-| Critical | Advisory credit, release-note credit | up to **USD 2,000** |
-| High | Advisory credit, release-note credit | up to **USD 500** |
-| Medium | Advisory credit | up to **USD 150** |
-| Low | Advisory credit | none |
+Every accepted report is eligible for public credit in the advisory and release
+notes, at the reporter's option. Halofy may also offer a monetary award at its
+sole discretion. There is no published rate card or guaranteed payout. If an
+award is available, we will state the amount in the triage verdict before the
+reporter does additional work.
 
 Things we will say plainly rather than bury:
 
-- If we cannot pay, we will tell you **at triage**, not after the fix ships.
 - Only the **first complete** report of an issue is eligible.
 - Awards are at Halofy's sole discretion and are not a contract. Nothing here
   creates an obligation to pay, and none of it changes the warranty disclaimer in
@@ -261,8 +254,8 @@ Things we will say plainly rather than bury:
 
 ### Beyond the bounty
 
-Two things are worth more to us than a vulnerability report and are rewarded the
-same way:
+Two things are worth more to us than a vulnerability report and are recognized
+the same way:
 
 1. **A regression test.** Convert your finding into a test in `kernel/test/` in
    the style of `kernel/test/cross-tenant.test.ts`. It gets merged with your

@@ -7,11 +7,6 @@ holds them today.
 Changes to this file land as pull requests, so the history of who could merge
 what is public and diffable.
 
-> **FILL-BEFORE-PUBLISH** — the GitHub handles below are placeholders. Replace
-> every `@handle` with a real account, and delete this block, before the first
-> public push. A roster naming nobody is worse than no roster: it makes the
-> escalation path in `GOVERNANCE.md` section 3 undefined.
-
 ## Project lead
 
 Breaks ties between area owners, owns the locked decisions (D1–D10), and is
@@ -19,7 +14,7 @@ accountable for release decisions.
 
 | Name | GitHub | Affiliation |
 |---|---|---|
-| _to be filled_ | `@handle` | Halofy |
+| Koushik Bhargav | [`@koushikbhargav`](https://github.com/koushikbhargav) | Halofy |
 
 ## Area owners and maintainers
 
@@ -28,12 +23,12 @@ per-area: a console maintainer does not merge migrations.
 
 | Area | Owner | Maintainers |
 |---|---|---|
-| Kernel core — write path, index, storage, tiers, movement, consolidation | `@handle` | `@handle` |
-| Retrieval — drivers, conformance kit, allocator, referee | `@handle` | `@handle` |
-| Security & tenancy — auth, IAM, tenancy, ACL, policy, audit, encryption, migrations | `@handle` | `@handle` |
-| Console — `kernel/console/`, `kernel/src/console/` | `@handle` | `@handle` |
-| Platform — HTTP transport, MCP, CLI, deployment, self-hosting | `@handle` | `@handle` |
-| Docs — `docs/`, root documents | `@handle` | `@handle` |
+| Kernel core: write path, index, storage, tiers, movement, consolidation | `@koushikbhargav` | `@koushikbhargav` |
+| Retrieval: drivers, conformance kit, allocator, referee | `@koushikbhargav` | `@koushikbhargav` |
+| Security and tenancy: auth, IAM, tenancy, ACL, policy, audit, encryption, migrations | `@koushikbhargav` | `@koushikbhargav` |
+| Console: `kernel/console/`, `kernel/src/console/` | `@koushikbhargav` | `@koushikbhargav` |
+| Platform: HTTP transport, MCP, CLI, deployment, self-hosting | `@koushikbhargav` | `@koushikbhargav` |
+| Docs: `docs/`, root documents | `@koushikbhargav` | `@koushikbhargav` |
 
 `.github/CODEOWNERS` routes review requests using GitHub teams rather than
 individual handles. The teams named there must contain the people named here;

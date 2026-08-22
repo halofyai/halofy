@@ -6,7 +6,7 @@
     "type": "git",
     "url": "git+https://github.com/halofyai/halofy.git"
   },
-  "description": "Halofy organizational memory kernel — vMMU, memory index, tiered storage, MCP syscall surface",
+  "description": "Halofy organizational memory kernel: vMMU, memory index, tiered storage, MCP syscall surface",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
