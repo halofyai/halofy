@@ -30,6 +30,7 @@ import {
 import { sourceAccessSubject } from "../syscalls/index.js";
 import { AuthzError, isRootOwner, isSelfOrDescendant } from "../auth/index.js";
 import type { AuditLog, AuditSearchFilters, AuditSummary } from "../audit/index.js";
+import { trimRepeatedCharacter } from "../strings.js";
 import { buildSyncOverview } from "./rollups/sync-overview.js";
 import type { SourceOverviewRow } from "./rollups/sync-overview.js";
 import { buildSourceLineage } from "./rollups/source-lineage.js";
@@ -3130,9 +3131,10 @@ export async function auditExportCsv(
   const csv = `﻿${lines.join("\r\n")}\r\n`;
   const sha256 = createHash("sha256").update(csv, "utf8").digest("hex");
   const stamp = new Date().toISOString();
-  const nsPart = (identity.namespace === "" ? "organization" : identity.namespace)
-    .replace(/[^A-Za-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "organization";
+  const namespaceSlug = (
+    identity.namespace === "" ? "organization" : identity.namespace
+  ).replace(/[^A-Za-z0-9._-]+/g, "-");
+  const nsPart = trimRepeatedCharacter(namespaceSlug, "-") || "organization";
 
   await kernel.audit.append({
     ts: stamp,

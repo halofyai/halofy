@@ -23,6 +23,7 @@ import { access, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { assertSupportedDeployment, loadConfig, type KernelConfig } from "./config.js";
+import { trimTrailingRepeatedCharacter } from "./strings.js";
 import type {
   AccessSubject,
   ChannelAuthorityContext,
@@ -6190,7 +6191,7 @@ export class Kernel {
     this.assertWarmAdmin(identity, "warm-store rebuild");
     // Normalize: a trailing slash would wipe the mirror subtree and then
     // stream back zero records (the ancestor relation never emits "acme/").
-    const target = namespace.trim().replace(/\/+$/, "");
+    const target = trimTrailingRepeatedCharacter(namespace.trim(), "/");
     if (target.length === 0) {
       throw new Error("warm-store rebuild requires a namespace");
     }

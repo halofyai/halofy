@@ -33,6 +33,7 @@ import {
 } from "./clients.js";
 import { OAuthCodeError, type OAuthCodeService } from "./codes.js";
 import { OAUTH_SCOPES } from "./authorize.js";
+import { trimTrailingRepeatedCharacter } from "../strings.js";
 import {
   OAuthTokenError,
   type OAuthTokenIdentity,
@@ -472,7 +473,7 @@ export async function handleRevocationRequest(
 
 /** GET /.well-known/oauth-authorization-server (RFC 8414). Pure — no store. */
 export function authorizationServerMetadata(issuerBaseUrl: string): OAuthHttpResponse {
-  const issuer = issuerBaseUrl.replace(/\/+$/, "");
+  const issuer = trimTrailingRepeatedCharacter(issuerBaseUrl, "/");
   return {
     status: 200,
     headers: { "content-type": "application/json" },
@@ -505,7 +506,7 @@ export function protectedResourceMetadata(
   issuerBaseUrl: string,
   resourceSuffix = "",
 ): OAuthHttpResponse {
-  const issuer = issuerBaseUrl.replace(/\/+$/, "");
+  const issuer = trimTrailingRepeatedCharacter(issuerBaseUrl, "/");
   return {
     status: 200,
     headers: { "content-type": "application/json" },
@@ -526,7 +527,7 @@ export function protectedResourceMetadata(
 
 /** OA7 — the WWW-Authenticate value a 401 on /mcp carries (RFC 9728 §5.1). */
 export function mcpChallengeHeader(issuerBaseUrl: string): string {
-  const issuer = issuerBaseUrl.replace(/\/+$/, "");
+  const issuer = trimTrailingRepeatedCharacter(issuerBaseUrl, "/");
   return `Bearer resource_metadata="${issuer}/.well-known/oauth-protected-resource/mcp"`;
 }
 

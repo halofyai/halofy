@@ -69,6 +69,21 @@ describe("console breadcrumbs", () => {
     expect(html).toContain('aria-current="page"');
   });
 
+  it("decodes only one layer of pre-escaped navigation text", () => {
+    const trail = buildBreadcrumbTrail({
+      navigation: [
+        {
+          group: "Govern",
+          items: [{ s: "s6", label: "Sources &amp;lt; imports" }],
+        },
+      ],
+      allowedScreens: new Set(["s6"]),
+      screenId: "s6",
+    });
+
+    expect(trail[0]?.label).toBe("Sources &lt; imports");
+  });
+
   it("does not invent an inaccessible Home ancestor for restricted roles", () => {
     const trail = buildBreadcrumbTrail({
       navigation,

@@ -36,6 +36,7 @@ import { createHash } from "node:crypto";
 import { classifyData } from "../dlp/classifier.js";
 import { destinationAllowed } from "../dlp/policy.js";
 import { AuthzError, ROLES } from "../auth/index.js";
+import { trimRepeatedCharacter } from "../strings.js";
 import type {
   AccessSubject,
   AuditEvent,
@@ -332,7 +333,8 @@ function renderConcept(concept: Concept): string {
 }
 
 function filenameSlug(value: string): string {
-  return value.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const safe = value.replace(/[^A-Za-z0-9._-]+/g, "-");
+  return trimRepeatedCharacter(safe, "-");
 }
 
 function exportFilename(

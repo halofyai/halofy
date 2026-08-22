@@ -60,6 +60,16 @@ async function settle(): Promise<void> {
   for (let i = 0; i < 20; i += 1) await Promise.resolve();
 }
 
+function inlineScript(source: string): string | null {
+  const opening = "<script>";
+  const closing = "</script>";
+  const start = source.indexOf(opening);
+  if (start < 0) return null;
+  const contentStart = start + opening.length;
+  const end = source.indexOf(closing, contentStart);
+  return end < 0 ? null : source.slice(contentStart, end);
+}
+
 async function bootLogin(options: {
   emailDeliveryReady?: boolean;
   configRejects?: boolean;
@@ -67,7 +77,7 @@ async function bootLogin(options: {
   replies?: FetchReply[];
 } = {}) {
   const source = await loginSource();
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  const script = inlineScript(source);
   if (!script) throw new Error("login script not found");
 
   let activeElement: FakeElement | null = null;

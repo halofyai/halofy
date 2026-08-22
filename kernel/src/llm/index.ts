@@ -10,6 +10,7 @@
 
 import type { DisputeCategory, LlmClient, LlmUsage } from "../types.js";
 import type { KernelConfig } from "../config.js";
+import { trimTrailingRepeatedCharacter } from "../strings.js";
 
 // ---------------------------------------------------------------------------
 // Prompt-kind markers (StubLlm dispatches on these)
@@ -132,7 +133,6 @@ export function parseLooseJson(text: string): unknown {
 // StubLlm — deterministic, zero network
 // ---------------------------------------------------------------------------
 
-const DIALOGUE_LINE = /^([A-Za-z][A-Za-z0-9 _.-]{0,40}?):\s+(.+)$/;
 const ASSISTANT_LABELS = new Set([
   "assistant",
   "ai",
@@ -141,6 +141,45 @@ const ASSISTANT_LABELS = new Set([
   "system",
   "claude",
 ]);
+
+function framedText(
+  input: string,
+  opening: string,
+  closing: string,
+): string | null {
+  const openingAt = input.indexOf(opening);
+  if (openingAt < 0) return null;
+  const contentAt = openingAt + opening.length;
+  const closingAt = input.indexOf(closing, contentAt);
+  if (closingAt < 0) return null;
+  return input.slice(contentAt, closingAt);
+}
+
+function isAsciiLetter(character: string): boolean {
+  const code = character.charCodeAt(0);
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+}
+
+function dialogueParts(line: string): [label: string, utterance: string] | null {
+  const colonAt = line.indexOf(":");
+  if (colonAt < 1 || colonAt > 41 || !isAsciiLetter(line[0]!)) return null;
+  for (let i = 1; i < colonAt; i += 1) {
+    const character = line[i]!;
+    const code = character.charCodeAt(0);
+    const allowed =
+      isAsciiLetter(character) ||
+      (code >= 48 && code <= 57) ||
+      character === " " ||
+      character === "_" ||
+      character === "." ||
+      character === "-";
+    if (!allowed) return null;
+  }
+  const afterColon = line.slice(colonAt + 1);
+  if (afterColon.length === 0 || !/\s/.test(afterColon[0]!)) return null;
+  const utterance = afterColon.trim();
+  return utterance === "" ? null : [line.slice(0, colonAt), utterance];
+}
 
 /**
  * Deterministic proper-noun entity mentions in a piece of text: distinct
@@ -230,10 +269,14 @@ export class StubLlm implements LlmClient {
   }
 
   private relationship(user: string): Record<string, unknown> {
-    const match = /<<<RELATIONSHIP_CANDIDATE_JSON\s*\n([\s\S]*?)\nRELATIONSHIP_CANDIDATE_JSON/.exec(user);
+    const payload = framedText(
+      user,
+      "<<<RELATIONSHIP_CANDIDATE_JSON\n",
+      "\nRELATIONSHIP_CANDIDATE_JSON",
+    );
     let parsed: unknown;
     try {
-      parsed = match?.[1] ? JSON.parse(match[1]) as unknown : null;
+      parsed = payload ? (JSON.parse(payload) as unknown) : null;
     } catch {
       parsed = null;
     }
@@ -274,10 +317,10 @@ export class StubLlm implements LlmClient {
     for (const rawLine of transcript.split(/\r?\n/)) {
       const line = rawLine.trim();
       if (line.length === 0) continue;
-      const m = DIALOGUE_LINE.exec(line);
-      if (!m) continue;
-      const label = m[1]!.trim().toLowerCase();
-      const utterance = m[2]!.trim();
+      const parts = dialogueParts(line);
+      if (!parts) continue;
+      const label = parts[0].trim().toLowerCase();
+      const utterance = parts[1];
       facts.push({
         content: utterance,
         speaker: ASSISTANT_LABELS.has(label) ? "assistant" : "user",
@@ -300,10 +343,10 @@ export class StubLlm implements LlmClient {
   }
 
   private verify(user: string): { verified: boolean; reason: string } {
-    const tm = /TRANSCRIPT:\s*<<<([\s\S]*?)>>>/.exec(user);
-    const cm = /CANDIDATE FACT:\s*<<<([\s\S]*?)>>>/.exec(user);
-    const transcript = tm?.[1] ?? user;
-    const candidate = cm?.[1] ?? "";
+    const transcript =
+      framedText(user, "TRANSCRIPT:\n<<<\n", "\n>>>\nCANDIDATE FACT:") ?? user;
+    const candidate =
+      framedText(user, "CANDIDATE FACT:\n<<<\n", "\n>>>\nTIMESTAMP:") ?? "";
     const transcriptWords = new Set(
       normalizeForVerify(transcript).split(/\s+/).filter(Boolean),
     );
@@ -312,12 +355,20 @@ export class StubLlm implements LlmClient {
 
   /** Same word-overlap heuristic as `verify`, applied per batched candidate. */
   private verifyBatch(user: string): { id: number; verified: boolean }[] {
-    const tm = /TRANSCRIPT:\s*<<<([\s\S]*?)>>>/.exec(user);
-    const cm = /CANDIDATE FACTS \(JSON\):\s*<<<([\s\S]*?)>>>/.exec(user);
-    const transcript = tm?.[1] ?? user;
+    const transcript =
+      framedText(
+        user,
+        "TRANSCRIPT:\n<<<\n",
+        "\n>>>\nCANDIDATE FACTS (JSON):",
+      ) ?? user;
+    const candidates = framedText(
+      user,
+      "CANDIDATE FACTS (JSON):\n<<<\n",
+      "\n>>>\nTIMESTAMP:",
+    );
     let items: unknown;
     try {
-      items = JSON.parse(cm?.[1]?.trim() ?? "[]");
+      items = JSON.parse(candidates?.trim() ?? "[]");
     } catch {
       items = [];
     }
@@ -467,7 +518,7 @@ export class AzureOpenAiLlm implements LlmClient {
     user: string,
     opts?: { signal?: AbortSignal; onUsage?: (usage: LlmUsage) => void },
   ): Promise<string> {
-    const base = this.endpoint.replace(/\/+$/, "");
+    const base = trimTrailingRepeatedCharacter(this.endpoint, "/");
     const url = `${base}/openai/deployments/${this.deployment}/chat/completions?api-version=${this.apiVersion}`;
     const res = await fetch(url, {
       method: "POST",
@@ -529,7 +580,8 @@ export class OpenAiCompatibleLlm implements LlmClient {
     user: string,
     opts?: { signal?: AbortSignal; onUsage?: (usage: LlmUsage) => void },
   ): Promise<string> {
-    const res = await fetch(`${this.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
+    const base = trimTrailingRepeatedCharacter(this.baseUrl, "/");
+    const res = await fetch(`${base}/chat/completions`, {
       method: "POST",
       signal: opts?.signal,
       headers: {

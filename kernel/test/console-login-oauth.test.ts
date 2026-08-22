@@ -8,7 +8,18 @@ const LOGIN_HTML = readFileSync(
   fileURLToPath(new URL("../console/login.html", import.meta.url)),
   "utf8",
 );
-const LOGIN_SCRIPT = LOGIN_HTML.match(/<script>\s*([\s\S]*?)<\/script>/)?.[1];
+
+function inlineScript(source: string): string | null {
+  const opening = "<script>";
+  const closing = "</script>";
+  const start = source.indexOf(opening);
+  if (start < 0) return null;
+  const contentStart = start + opening.length;
+  const end = source.indexOf(closing, contentStart);
+  return end < 0 ? null : source.slice(contentStart, end).trimStart();
+}
+
+const LOGIN_SCRIPT = inlineScript(LOGIN_HTML);
 
 if (!LOGIN_SCRIPT) throw new Error("login.html has no inline script");
 

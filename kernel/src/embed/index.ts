@@ -8,6 +8,7 @@
 
 import type { Embedder } from "../types.js";
 import type { KernelConfig } from "../config.js";
+import { trimTrailingRepeatedCharacter } from "../strings.js";
 
 export const HASH_EMBED_DIM = 256;
 export const OPENAI_EMBED_DIM = 1536;
@@ -325,7 +326,7 @@ export class AzureOpenAiEmbedder implements Embedder {
   ) {}
 
   async embed(texts: string[]): Promise<number[][]> {
-    const base = this.endpoint.replace(/\/+$/, "");
+    const base = trimTrailingRepeatedCharacter(this.endpoint, "/");
     const url = `${base}/openai/deployments/${this.deployment}/embeddings?api-version=${this.apiVersion}`;
     const out: number[][] = [];
     for (let i = 0; i < texts.length; i += PROVIDER_EMBED_BATCH_SIZE) {

@@ -686,8 +686,24 @@
       var hash = window.location.hash.replace(/^#/, "");
       if (!hash) return {};
       var params = new URLSearchParams(hash);
-      var out = {};
-      params.forEach(function (value, key) { out[key] = value; });
+      var out = {
+        access_token: "",
+        refresh_token: "",
+        provider_token: "",
+        provider_refresh_token: "",
+        error_description: "",
+        error: "",
+        type: "",
+      };
+      params.forEach(function (value, key) {
+        if (key === "access_token") out.access_token = value;
+        else if (key === "refresh_token") out.refresh_token = value;
+        else if (key === "provider_token") out.provider_token = value;
+        else if (key === "provider_refresh_token") out.provider_refresh_token = value;
+        else if (key === "error_description") out.error_description = value;
+        else if (key === "error") out.error = value;
+        else if (key === "type") out.type = value;
+      });
       if (
         out.access_token ||
         out.refresh_token ||

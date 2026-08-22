@@ -131,6 +131,9 @@ describe("command palette screens and actions", () => {
 
   it("decodes pre-escaped rail labels and keeps the Audit screen name concise", () => {
     expect(decodeNavLabel("Policies &amp; controls")).toBe("Policies & controls");
+    expect(decodeNavLabel("Policies &amp;lt; controls")).toBe(
+      "Policies &lt; controls",
+    );
     const items = buildScreenItems({ navigation: NAV, allowedScreens: ALL });
     expect(items.find((i) => i.perform.screen === "s8")?.label).toBe("Audit");
   });

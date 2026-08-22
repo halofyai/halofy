@@ -28,6 +28,7 @@ import type {
   WarmStoreHealth,
 } from "../types.js";
 import { WarmStoreUnavailableError } from "./errors.js";
+import { trimTrailingRepeatedCharacter } from "../strings.js";
 
 /** Per-attempt timeout (contract: 1.5s). */
 export const WARMSTORE_TIMEOUT_MS = 1500;
@@ -96,7 +97,7 @@ export class HttpWarmStore implements WarmStoreDriver {
       );
     }
     this.name = opts.name;
-    this.url = parsed.toString().replace(/\/+$/, "");
+    this.url = trimTrailingRepeatedCharacter(parsed.toString(), "/");
     this.timeoutMs = opts.timeoutMs ?? WARMSTORE_TIMEOUT_MS;
     this.retries = opts.retries ?? WARMSTORE_RETRIES;
     this.fetchImpl = opts.fetchImpl ?? fetch;

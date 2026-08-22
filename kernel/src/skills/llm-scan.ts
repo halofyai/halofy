@@ -18,6 +18,7 @@
 import { redactForOutbound } from "./redact.js";
 import { clampFindingText } from "./vetting.js";
 import type { SkillScanLane, VettingFinding, VettingSeverity } from "./vetting.js";
+import { trimTrailingRepeatedCharacter } from "../strings.js";
 
 /** Any lane failure shape lands on this single error type. */
 export class SkillScanLaneError extends Error {}
@@ -191,7 +192,7 @@ export class OpenAiCompatibleScanClient implements SkillScanClient {
 
   async complete(system: string, user: string): Promise<string> {
     const fetchFn = this.opts.fetchFn ?? fetch;
-    const url = `${this.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+    const url = `${trimTrailingRepeatedCharacter(this.baseUrl, "/")}/chat/completions`;
     const res = await fetchFn(url, {
       method: "POST",
       headers: {
@@ -246,7 +247,8 @@ export class AzureOpenAiScanClient implements SkillScanClient {
     if (parsed.protocol !== "https:" || !allowedHost || parsed.username || parsed.password) {
       throw new SkillScanLaneError("azure openai endpoint must be an HTTPS Azure AI host");
     }
-    this.baseUrl = parsed.origin + parsed.pathname.replace(/\/+$/, "");
+    this.baseUrl =
+      parsed.origin + trimTrailingRepeatedCharacter(parsed.pathname, "/");
   }
 
   async complete(

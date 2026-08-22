@@ -25,6 +25,7 @@
 import { escapeHtml, renderHaloFrame, renderHaloStatusPage } from "../branding/halo-page.js";
 import type { AuditLog } from "../audit/index.js";
 import type { Identity, Namespace } from "../types.js";
+import { trimTrailingRepeatedCharacter } from "../strings.js";
 import type { OAuthClientRecord, OAuthClientService, OAuthTokenRole } from "./clients.js";
 import type { OAuthCodeService } from "./codes.js";
 
@@ -138,7 +139,7 @@ function redirectError(
   url.searchParams.set("error", error);
   url.searchParams.set("error_description", description);
   if (state !== "") url.searchParams.set("state", state);
-  url.searchParams.set("iss", issuer.replace(/\/+$/, ""));
+  url.searchParams.set("iss", trimTrailingRepeatedCharacter(issuer, "/"));
   return redirect(url.toString());
 }
 
@@ -431,6 +432,6 @@ export async function handleAuthorizeDecision(
   const url = new URL(redirectUri);
   url.searchParams.set("code", code);
   if (state !== "") url.searchParams.set("state", state);
-  url.searchParams.set("iss", issuer.replace(/\/+$/, ""));
+  url.searchParams.set("iss", trimTrailingRepeatedCharacter(issuer, "/"));
   return redirect(url.toString());
 }

@@ -1,10 +1,17 @@
 function navigationLabel(value) {
-  return String(value || "")
-    .replaceAll("&amp;", "&")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&#39;", "'");
+  return String(value || "").replace(
+    /&(?:amp|lt|gt|quot|#39);/g,
+    function decodeEntity(entity) {
+      switch (entity) {
+        case "&amp;": return "&";
+        case "&lt;": return "<";
+        case "&gt;": return ">";
+        case "&quot;": return '"';
+        case "&#39;": return "'";
+        default: return entity;
+      }
+    },
+  );
 }
 
 /** Build a role-safe breadcrumb trail from the same model as the console rail. */

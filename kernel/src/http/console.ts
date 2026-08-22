@@ -298,25 +298,28 @@ export async function serveStatic(
  * A missing header → {}. Later duplicates win.
  */
 export function parseCookies(header: string | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (!header) return out;
+  const entries: [string, string][] = [];
+  if (!header) return {};
   for (const part of header.split(";")) {
     const eq = part.indexOf("=");
     if (eq < 0) continue;
     const name = part.slice(0, eq).trim();
     if (name === "") continue;
+    if (name === "__proto__" || name === "prototype" || name === "constructor") {
+      continue;
+    }
     let value = part.slice(eq + 1).trim();
     // Strip surrounding double quotes if present.
     if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
       value = value.slice(1, -1);
     }
     try {
-      out[name] = decodeURIComponent(value);
+      entries.push([name, decodeURIComponent(value)]);
     } catch {
-      out[name] = value;
+      entries.push([name, value]);
     }
   }
-  return out;
+  return Object.fromEntries(entries);
 }
 
 /**

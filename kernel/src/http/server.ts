@@ -90,6 +90,7 @@ import {
   type PublicDiscoveryResponse,
 } from "../discovery/public.js";
 import { mcpChallengeHeader } from "../oauth/server.js";
+import { trimTrailingRepeatedCharacter } from "../strings.js";
 
 // ---------------------------------------------------------------------------
 // Structural dependency surface (hand-rollable in tests; the integrator wires
@@ -1792,7 +1793,7 @@ function writePageEnvelope(
 
 /** Canonical issuer origin, falling back to the direct request for local/dev. */
 function issuerBaseUrl(deps: HttpServerDeps, req: IncomingMessage): string {
-  if (deps.publicUrl) return deps.publicUrl.replace(/\/+$/, "");
+  if (deps.publicUrl) return trimTrailingRepeatedCharacter(deps.publicUrl, "/");
   const proto =
     headerValue(req.headers["x-forwarded-proto"]) ??
     (deps.secureCookies === true ? "https" : "http");
@@ -3837,7 +3838,7 @@ async function route(
     try {
       await deps.copilot.probe();
       return json(res, 200, { ok: true });
-    } catch {
+    } catch (error) {
       return json(res, 503, { ok: false });
     }
   }
@@ -4361,7 +4362,7 @@ async function route(
         return scimJson(
           res,
           400,
-          scimError(400, error.message, "invalidValue"),
+          scimError(400, "invalid SCIM request", "invalidValue"),
         );
       }
       throw error;
@@ -5197,14 +5198,14 @@ async function route(
     let body: Record<string, unknown>;
     try {
       body = await readJsonObject(req);
-    } catch (error) {
+    } catch {
       await auditHaloAgentsHandoff(
         deps,
         identity,
         "denied",
         `400 ${method} ${path} invalid request body`,
       );
-      throw error;
+      throw new HttpError(400, "invalid_body", "invalid request body");
     }
     if (Object.keys(body).length !== 0) {
       await auditHaloAgentsHandoff(
@@ -5552,7 +5553,7 @@ async function route(
       parsed = parseManifestArgs(Object.fromEntries(url.searchParams));
     } catch (err) {
       if (err instanceof ManifestArgsError) {
-        throw new HttpError(400, "bad_request", err.message);
+        throw new HttpError(400, "bad_request", "invalid manifest request");
       }
       throw err;
     }

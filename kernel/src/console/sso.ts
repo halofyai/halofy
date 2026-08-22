@@ -27,6 +27,7 @@
  */
 
 import type { User } from "../types.js";
+import { trimTrailingRepeatedCharacter } from "../strings.js";
 import type {
   AuthStores,
   InvitationStore,
@@ -135,7 +136,7 @@ export class SupabaseSsoService {
   private readonly allowOrganizationSignup: boolean;
 
   constructor(options: SupabaseSsoOptions) {
-    this.url = options.url.replace(/\/+$/, "");
+    this.url = trimTrailingRepeatedCharacter(options.url, "/");
     this.anonKey = options.anonKey;
     this.stores = options.stores;
     this.invitations = options.invitations;

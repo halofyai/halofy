@@ -38,6 +38,7 @@
 import type { RetrieverDriver, RetrieverQuery, ScoredRef } from "../types.js";
 import { estimateTokens } from "../types.js";
 import { DriverUnavailableError } from "./index.js";
+import { trimTrailingRepeatedCharacter } from "../strings.js";
 
 // Single canonical error class for the whole driver package (integration:
 // module A's src/driver/index.ts owns it; re-exported here so existing
@@ -112,7 +113,7 @@ export class Mem0Driver implements RetrieverDriver {
         "remote sidecar URL requires an authentication token",
       );
     }
-    this.url = parsed.toString().replace(/\/+$/, "");
+    this.url = trimTrailingRepeatedCharacter(parsed.toString(), "/");
     this.timeoutMs = opts.timeoutMs ?? MEM0_TIMEOUT_MS;
     this.retries = opts.retries ?? MEM0_RETRIES;
     this.candidateLimit = opts.candidateLimit ?? MEM0_CANDIDATE_LIMIT;

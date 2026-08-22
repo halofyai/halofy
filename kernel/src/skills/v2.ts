@@ -13,6 +13,7 @@
  */
 
 import type { KernelConfig } from "../config.js";
+import { trimTrailingRepeatedCharacter } from "../strings.js";
 import {
   CISCO_SPEC,
   SKILLSPECTOR_SPEC,
@@ -40,7 +41,7 @@ interface ScanProvider {
 /** The configured scan provider, or null when no scan model is configured. */
 function scanProvider(config: KernelConfig): ScanProvider | null {
   if (config.skillScanLlmBaseUrl && config.skillScanLlmApiKey && config.skillScanLlmModel) {
-    const base = config.skillScanLlmBaseUrl.replace(/\/+$/, "");
+    const base = trimTrailingRepeatedCharacter(config.skillScanLlmBaseUrl, "/");
     const host = /^https?:\/\/([^/]+)/.exec(base)?.[1] ?? base;
     return {
       baseUrl: base,
@@ -54,7 +55,7 @@ function scanProvider(config: KernelConfig): ScanProvider | null {
     config.azureOpenaiScanEndpoint &&
     config.azureOpenaiScanDeployment
   ) {
-    const base = `${config.azureOpenaiScanEndpoint.replace(/\/+$/, "")}/openai/v1/`;
+    const base = `${trimTrailingRepeatedCharacter(config.azureOpenaiScanEndpoint, "/")}/openai/v1/`;
     return {
       baseUrl: base,
       apiKey: config.azureOpenaiScanApiKey,
