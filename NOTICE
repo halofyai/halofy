@@ -1,0 +1,42 @@
+HaloMem — an organizational memory kernel for AI agent fleets
+Copyright (C) 2026 Halofy
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License along
+with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+--------------------------------------------------------------------------------
+DUAL LICENSING
+
+The AGPL-3.0 is not the only way to use this software. If the AGPL's network
+copyleft obligations are incompatible with your deployment, a commercial license
+is available from Halofy that removes them. Contact: licensing@halofy.ai
+
+--------------------------------------------------------------------------------
+PERMISSIVELY LICENSED SUBTREES
+
+The following directories are licensed under the Apache License 2.0 (see
+LICENSE-APACHE-2.0), NOT the AGPL, so that they may be embedded freely in
+closed-source applications:
+
+  kernel/src/driver/        retrieval driver interface + reference cartridges
+  kernel/src/mcp/           MCP server
+  kernel/integrations/      editor and agent integrations
+
+Each such directory carries its own LICENSE file. Where a file in those trees
+does not state otherwise, Apache-2.0 applies. LICENSING.md explains the
+boundary and the one-way rule that governs moving code across it.
+
+--------------------------------------------------------------------------------
+TRADEMARKS
+
+"Halofy", "HaloMem", and the Halofy logo are trademarks of Halofy. Neither the
+AGPL-3.0 nor the Apache-2.0 grant any right to use them. See TRADEMARK.md.

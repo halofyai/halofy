@@ -1,0 +1,11 @@
+{
+  "name": "halomem-integrations",
+  "owner": { "name": "HaloMem" },
+  "plugins": [
+    {
+      "name": "halomem",
+      "source": "./claude-code",
+      "description": "Organizational memory for Claude Code: recalls relevant HaloMem memories at session start, captures the session through the governed write path at session end, and registers the halomem MCP tools (mem_search / mem_write / mem_read)."
+    }
+  ]
+}

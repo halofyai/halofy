@@ -1,0 +1,102 @@
+name: gitleaks
+
+on:
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main, master]
+  schedule:
+    - cron: "47 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitleaks-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve secret-scan range
+        id: range
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CURRENT_SHA: ${{ github.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MERGE_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base_sha=""
+          head_sha="$CURRENT_SHA"
+          full_history=false
+
+          case "$EVENT_NAME" in
+            pull_request)
+              base_sha="$PR_BASE_SHA"
+              head_sha="$PR_HEAD_SHA"
+              ;;
+            merge_group)
+              base_sha="$MERGE_BASE_SHA"
+              head_sha="$MERGE_HEAD_SHA"
+              ;;
+            push)
+              base_sha="$PUSH_BEFORE_SHA"
+              ;;
+            schedule|workflow_dispatch)
+              full_history=true
+              ;;
+            *)
+              full_history=true
+              ;;
+          esac
+
+          validate_sha() {
+            local value="$1"
+            local label="$2"
+            if [ -n "$value" ] && [[ ! "$value" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "$label is not a full Git SHA." >&2
+              exit 1
+            fi
+          }
+          validate_sha "$base_sha" "base_sha"
+          validate_sha "$head_sha" "head_sha"
+
+          if [ -z "$base_sha" ] || [[ "$base_sha" =~ ^0+$ ]]; then
+            full_history=true
+          fi
+
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "full_history=$full_history" >> "$GITHUB_OUTPUT"
+
+      - name: Scan changed commits
+        if: steps.range.outputs.full_history != 'true'
+        env:
+          BASE_SHA: ${{ steps.range.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.range.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD:/repo" \
+            zricethezav/gitleaks:v8.30.1 \
+            git --redact --verbose --log-opts="$BASE_SHA..$HEAD_SHA" /repo
+
+      - name: Scan full history
+        if: steps.range.outputs.full_history == 'true'
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD:/repo" \
+            zricethezav/gitleaks:v8.30.1 \
+            git --redact --verbose --log-opts=--all /repo

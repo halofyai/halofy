@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "halomem": {
+      "type": "http",
+      "url": "${HALOMEM_URL}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${HALOMEM_API_KEY}"
+      }
+    }
+  }
+}

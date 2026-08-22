@@ -1,0 +1,212 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: halomem-kernel
+  labels:
+    app.kubernetes.io/name: halomem-kernel
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: halomem-kernel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: halomem-kernel
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kernel
+          image: ghcr.io/halofyai/halofy:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8787
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: HALOMEM_HOST
+              value: 0.0.0.0
+            - name: HALOMEM_PORT
+              value: "8787"
+            - name: HALOMEM_SECURE_COOKIES
+              value: "true"
+            - name: HALOMEM_KNOWLEDGE_DIR
+              value: /app/knowledge
+            - name: HALOMEM_COLD_STORAGE
+              value: shared-persistent
+            - name: HALOMEM_PUBLIC_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: halomem-config
+                  key: public-url
+            - name: HALOMEM_HALO_AGENTS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: halomem-config
+                  key: halo-agents-url
+                  optional: true
+            - name: HALOMEM_HALO_AGENTS_SSO_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: halo-agents-sso-secret
+                  optional: true
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: database-url
+            - name: HALOMEM_BOOTSTRAP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: bootstrap-token
+            - name: HALOMEM_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: signing-key
+            - name: HALOMEM_COLD_KEK
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: cold-kek
+            - name: HALOMEM_SOURCE_CONFIG_KEK
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: source-config-kek
+            - name: HALOMEM_NOTION_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: notion-client-id
+                  optional: true
+            - name: HALOMEM_NOTION_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: notion-client-secret
+                  optional: true
+            - name: HALOMEM_NOTION_SYNC_INTERVAL_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: halomem-config
+                  key: notion-sync-interval-seconds
+                  optional: true
+            - name: HALOMEM_AIRTABLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: airtable-client-id
+                  optional: true
+            - name: HALOMEM_AIRTABLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: airtable-client-secret
+                  optional: true
+            - name: HALOMEM_AIRTABLE_SYNC_INTERVAL_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: halomem-config
+                  key: airtable-sync-interval-seconds
+                  optional: true
+            - name: HALOMEM_GOOGLE_DRIVE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: google-drive-client-id
+                  optional: true
+            - name: HALOMEM_GOOGLE_DRIVE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: google-drive-client-secret
+                  optional: true
+            - name: HALOMEM_SLACK_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: slack-client-id
+                  optional: true
+            - name: HALOMEM_SLACK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: slack-client-secret
+                  optional: true
+            - name: HALOMEM_SLACK_SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: slack-signing-secret
+                  optional: true
+            - name: SUPABASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: halomem-config
+                  key: supabase-url
+                  optional: true
+            - name: SUPABASE_ANON_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: halomem-secrets
+                  key: supabase-anon-key
+                  optional: true
+            - name: HALOMEM_SSO_EMAIL_DELIVERY_READY
+              valueFrom:
+                configMapKeyRef:
+                  name: halomem-config
+                  key: sso-email-delivery-ready
+                  optional: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 4
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: knowledge
+              mountPath: /app/knowledge
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: knowledge
+          persistentVolumeClaim:
+            claimName: halomem-knowledge
+        - name: tmp
+          emptyDir: {}

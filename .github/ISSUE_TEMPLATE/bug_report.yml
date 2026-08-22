@@ -1,0 +1,183 @@
+name: Bug report
+description: Something in the kernel, console, CLI or a driver behaves incorrectly and you can reproduce it.
+title: "bug: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, please confirm the problem still reproduces on the current
+        `master` and that it is not a question — questions go to Discussions.
+
+        If the bug is a security problem (ACL leak across namespaces, a syscall
+        that writes no audit row, a forged erasure certificate, credential
+        exposure) **stop and follow SECURITY.md instead**. Do not describe it here.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and discussions for this problem.
+          required: true
+        - label: This is not a security vulnerability (see SECURITY.md).
+          required: true
+        - label: I can reproduce this, or I have captured evidence that it happened.
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The observed behaviour, in plain terms. Paste real output rather than describing it.
+      placeholder: |
+        `mem.search` in namespace `acme/eng/platform` returned a row owned by `acme/eng/tooling`.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+      description: >-
+        Where something states the expected behaviour, cite it — a heading in
+        docs/architecture.md, a test under kernel/test/, or the module header of
+        the code you think is wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: >-
+        Numbered steps, starting from a clean checkout. A failing test case in the
+        shape of kernel/test/*.test.ts is the single most useful thing you can attach.
+      placeholder: |
+        1. npm ci
+        2. npm run demo
+        3. npx vitest run test/write-path.test.ts --maxWorkers=1
+        4. Observe: ...
+
+        Wrap pasted output in a fenced code block.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: HaloMem version and commit
+      description: >-
+        The `version` from kernel/package.json plus the output of `git rev-parse --short HEAD`.
+      placeholder: "0.1.0 @ a1b2c3d"
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      description: Output of `node --version`. The kernel targets Node 22.x.
+      placeholder: "v22.14.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How are you running it
+      options:
+        - Local checkout (npm run serve / npm run demo)
+        - Docker Compose (docker compose up --build)
+        - Self-hosted Kubernetes (kernel/deploy/kubernetes)
+        - Halofy managed cloud
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: model-path
+    attributes:
+      label: Extraction and embedding path
+      description: >-
+        With no keys set the kernel runs StubLlm + HashEmbedder deterministically —
+        that is the intended dev default. Which path was active when the bug happened?
+      options:
+        - Zero-key stub path (StubLlm + HashEmbedder, no API keys set)
+        - Real LLM only (ANTHROPIC_API_KEY set)
+        - Real embeddings only (OPENAI_API_KEY set)
+        - Both real LLM and real embeddings
+        - Other provider (Azure OpenAI / OpenAI-compatible endpoint)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      options:
+        - PGlite (embedded, the dev/test default)
+        - Postgres with pgvector (DATABASE_URL set)
+        - Other Postgres-compatible host
+    validations:
+      required: true
+
+  - type: dropdown
+    id: driver
+    attributes:
+      label: Retrieval driver in use
+      description: Retrieval is delegated to a driver cartridge (D1). Which one was mounted?
+      options:
+        - baseline
+        - graph
+        - mem0 (sidecar)
+        - A driver I wrote myself
+        - Not applicable / unknown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface
+      multiple: true
+      options:
+        - HTTP API
+        - MCP server
+        - Console (kernel/console)
+        - CLI (src/cli.ts)
+        - Write path / extraction
+        - Retrieval / allocator
+        - Migrations / schema
+        - Ingestion / importers
+        - Other
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, audit rows and stack traces
+      description: >-
+        Paste the relevant excerpt. Every syscall writes an `audit_log` row including
+        denied, miss, brownout and error outcomes (D4) — the row for the failing call
+        is usually the fastest route to a diagnosis. **Redact API keys, tokens,
+        hostnames and any real customer data before pasting.** Wrap the excerpt
+        in a fenced code block.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: >-
+        Namespace shape (note if it contains `_`, `%` or a backslash — those have
+        bitten the ACL prefix match before), tenant layout, data volume, or a diff
+        of your local changes.
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing a fix
+      options:
+        - label: I am willing to open a pull request for this.
+        - label: I have already signed the CLA, or am willing to sign it.

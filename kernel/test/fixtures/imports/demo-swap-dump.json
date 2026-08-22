@@ -1,0 +1,12 @@
+{
+  "results": [
+    {
+      "id": "swap-dana-addr",
+      "memory": "customer Dana Whitfield's current shipping address for order 4127 is 99 Oak Street, Springfield",
+      "metadata": {
+        "collection": "legacy_crm_export",
+        "note": "cross-source near-duplicate of the fact the support agent already captured in conversation"
+      }
+    }
+  ]
+}

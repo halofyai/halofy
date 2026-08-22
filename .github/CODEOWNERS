@@ -1,0 +1,159 @@
+# CODEOWNERS — who is automatically requested for review.
+#
+# Ownership here is about who must look, not about who may contribute. The
+# security-owners rows cover the boundaries listed in CONTRIBUTING.md section 2
+# as maintained in-house: identity and sessions, ACL and tenancy, migrations,
+# credential and token encryption, policy evaluation, the audit path, and the
+# write/retrieval boundary. Expect those reviews to be slower and more
+# adversarial than the rest. Rows outside that list say who must look, not who
+# may contribute.
+#
+# Last matching pattern wins, so the boundary rows are deliberately at the bottom.
+
+# ---------------------------------------------------------------------------
+# Default
+# ---------------------------------------------------------------------------
+
+*                                       @halofyai/kernel-maintainers
+
+# ---------------------------------------------------------------------------
+# Project governance, licensing and community files
+# ---------------------------------------------------------------------------
+
+/LICENSE                                @halofyai/licensing-owners
+/LICENSE-APACHE-2.0                     @halofyai/licensing-owners
+/LICENSING.md                           @halofyai/licensing-owners
+/NOTICE                                 @halofyai/licensing-owners
+/TRADEMARK.md                           @halofyai/licensing-owners
+/CLA.md                                 @halofyai/licensing-owners
+**/LICENSE                              @halofyai/licensing-owners
+
+/CODE_OF_CONDUCT.md                     @halofyai/kernel-maintainers
+/CONTRIBUTING.md                        @halofyai/kernel-maintainers
+/SUPPORT.md                             @halofyai/kernel-maintainers
+/GOVERNANCE.md                          @halofyai/kernel-maintainers
+/MAINTAINERS.md                         @halofyai/kernel-maintainers
+/CHANGELOG.md                           @halofyai/kernel-maintainers
+/README.md                              @halofyai/kernel-maintainers
+
+# ---------------------------------------------------------------------------
+# CI, supply chain and repository automation
+# ---------------------------------------------------------------------------
+
+/.github/                               @halofyai/kernel-maintainers
+/.github/workflows/                     @halofyai/security-owners
+/.github/dependabot.yml                 @halofyai/security-owners
+/.gitleaks.toml                         @halofyai/security-owners
+/.gitleaksignore                        @halofyai/security-owners
+/kernel/package.json                    @halofyai/kernel-maintainers @halofyai/security-owners
+/kernel/package-lock.json               @halofyai/security-owners
+
+# ---------------------------------------------------------------------------
+# Documentation
+# ---------------------------------------------------------------------------
+
+/docs/                                  @halofyai/docs-owners
+/docs/architecture.md                   @halofyai/docs-owners @halofyai/kernel-maintainers
+/docs/driver-kit.md                     @halofyai/docs-owners @halofyai/retrieval-owners
+/docs/self-hosting.md                   @halofyai/docs-owners @halofyai/platform-owners
+/docs/security/                         @halofyai/docs-owners @halofyai/security-owners
+/kernel/README.md                       @halofyai/kernel-maintainers
+
+# ---------------------------------------------------------------------------
+# Kernel subsystems
+# ---------------------------------------------------------------------------
+
+/kernel/src/types.ts                    @halofyai/kernel-maintainers
+/kernel/src/kernel.ts                   @halofyai/kernel-maintainers
+/kernel/src/config.ts                   @halofyai/kernel-maintainers
+/kernel/src/cli.ts                      @halofyai/kernel-maintainers
+/kernel/src/demo.ts                     @halofyai/kernel-maintainers
+
+# Storage, placement and movement
+/kernel/src/db/                         @halofyai/storage-owners
+/kernel/src/index/                      @halofyai/storage-owners
+/kernel/src/cold/                       @halofyai/storage-owners
+/kernel/src/warmstore/                  @halofyai/storage-owners
+/kernel/src/movement/                   @halofyai/storage-owners
+/kernel/src/cache/                      @halofyai/storage-owners
+/kernel/src/durable/                    @halofyai/storage-owners
+/kernel/src/pins/                       @halofyai/storage-owners
+
+# Retrieval — delegated (D1). Drivers are Apache-2.0 read-only cartridges.
+/kernel/src/retrieval/                  @halofyai/retrieval-owners
+/kernel/src/embed/                      @halofyai/retrieval-owners
+/kernel/src/allocator/                  @halofyai/retrieval-owners
+/kernel/src/fault/                      @halofyai/retrieval-owners
+/kernel/src/referee/                    @halofyai/retrieval-owners
+/kernel/src/routing/                    @halofyai/retrieval-owners
+/kernel/src/driver/                     @halofyai/retrieval-owners @halofyai/licensing-owners
+/kernel/src/conformance/                @halofyai/retrieval-owners @halofyai/security-owners
+/kernel/sidecar/                        @halofyai/retrieval-owners
+
+# Knowledge shaping over the write path
+/kernel/src/consolidation/              @halofyai/kernel-maintainers
+/kernel/src/relationships/              @halofyai/kernel-maintainers
+/kernel/src/conflict-scans/             @halofyai/kernel-maintainers
+/kernel/src/conflict-autopilot/         @halofyai/kernel-maintainers
+/kernel/src/entity-tagger/              @halofyai/kernel-maintainers
+/kernel/src/memory-titles/              @halofyai/kernel-maintainers
+/kernel/src/disputes/                   @halofyai/kernel-maintainers
+
+# Ingestion — must feed the write path, never the store (D10)
+/kernel/src/ingest/                     @halofyai/ingestion-owners
+/kernel/src/knowledge-bases/            @halofyai/ingestion-owners
+/kernel/src/skills/                     @halofyai/ingestion-owners
+
+# Transports
+/kernel/src/http/                       @halofyai/transport-owners
+/kernel/src/mcp/                        @halofyai/transport-owners @halofyai/licensing-owners
+/kernel/src/gateway/                    @halofyai/transport-owners
+/kernel/src/discovery/                  @halofyai/transport-owners
+/kernel/src/agent-sessions/             @halofyai/transport-owners
+
+# Operability
+/kernel/src/observability/              @halofyai/kernel-maintainers
+/kernel/src/metrics/                    @halofyai/kernel-maintainers
+/kernel/src/resilience/                 @halofyai/kernel-maintainers
+/kernel/src/readiness/                  @halofyai/kernel-maintainers
+/kernel/src/setup/                      @halofyai/kernel-maintainers
+
+# Console — render layer and its read models
+/kernel/console/                        @halofyai/console-owners
+/kernel/src/console/                    @halofyai/console-owners
+/kernel/src/branding/                   @halofyai/console-owners @halofyai/licensing-owners
+/kernel/test/*console-*.test.ts         @halofyai/console-owners
+
+# Integrations — Apache-2.0 subtree
+/kernel/integrations/                   @halofyai/kernel-maintainers @halofyai/licensing-owners
+
+# Packaging and self-hosting
+/kernel/Dockerfile                      @halofyai/platform-owners
+/kernel/docker-compose.yml              @halofyai/platform-owners
+/kernel/docker-entrypoint.sh            @halofyai/platform-owners
+/kernel/deploy/                         @halofyai/platform-owners
+/kernel/scripts/                        @halofyai/platform-owners
+
+# ---------------------------------------------------------------------------
+# Boundaries maintained in-house — reviewed by security-owners without exception
+# ---------------------------------------------------------------------------
+
+/kernel/src/auth/                       @halofyai/security-owners
+/kernel/src/iam/                        @halofyai/security-owners
+/kernel/src/oauth/                      @halofyai/security-owners
+/kernel/src/tenancy/                    @halofyai/security-owners
+/kernel/src/access-projection/          @halofyai/security-owners
+/kernel/src/team-memory-access/         @halofyai/security-owners
+/kernel/src/sharing/                    @halofyai/security-owners
+/kernel/src/policy/                     @halofyai/security-owners
+/kernel/src/security/                   @halofyai/security-owners
+/kernel/src/dlp/                        @halofyai/security-owners
+/kernel/src/audit/                      @halofyai/security-owners
+/kernel/src/erasure/                    @halofyai/security-owners
+/kernel/src/erasure-fence.ts            @halofyai/security-owners
+/kernel/src/export/                     @halofyai/security-owners
+/kernel/src/write/                      @halofyai/security-owners @halofyai/kernel-maintainers
+/kernel/src/syscalls/                   @halofyai/security-owners @halofyai/kernel-maintainers
+/kernel/src/db/migrations.ts            @halofyai/security-owners @halofyai/storage-owners
+/kernel/src/pii.ts                      @halofyai/security-owners
+/SECURITY.md                            @halofyai/security-owners

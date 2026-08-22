@@ -1,0 +1,38 @@
+# Dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Environment and local secrets — never commit these
+.env
+.env.*
+!.env.example
+
+# Python (the mem0 retrieval sidecar)
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Local kernel state
+data/
+
+# Caches and scratch
+.cache/
+.audit-tmp/
+*.log
+
+# Generated artifacts
+halomem-skills/
+
+# Local editor and assistant tooling state
+.claude/
+.cursor/
+.idea/
+.vscode/
+.DS_Store
+
+# Throwaway console screen previews: a screen module is rendered to a static
+# HTML file to eyeball it in a browser. Regenerable, never shipped.
+kernel/console/tmp-*.html

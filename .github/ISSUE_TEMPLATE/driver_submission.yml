@@ -1,0 +1,125 @@
+name: Retrieval driver submission
+description: Propose a new retrieval cartridge (a RetrieverDriver) for the kernel.
+title: "driver: "
+labels: ["driver", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Retrieval is delegated permanently (D1). A driver is a read-only cartridge:
+        the `ScopedView` handed to it is its entire world. It may import only
+        `src/types.js`, `src/retrieval/` and `src/embed/` — never storage, the write
+        path, or audit. `kernel/src/driver/` is the Apache-2.0 subtree, so a driver
+        can be embedded in a closed application; see LICENSING.md.
+
+        Existing cartridges live in `kernel/src/driver/`: `baseline.ts`, `graph.ts`,
+        `mem0.ts`, `view.ts`. Read `docs/driver-kit.md` before filing.
+
+        Part of the boundary is checked mechanically rather than by review:
+
+        ```
+        cd kernel && npx tsx src/cli.ts conformance <driverName>
+        ```
+
+        Six checks run against a hermetic fixture: `finds-planted-fact`,
+        `respects-scoped-view`, `latency-envelope`, `budget-discipline`,
+        `read-only`, `deterministic-k`. The `read-only` check is a static scan
+        of the driver source that rejects any import reaching the src barrel,
+        the kernel facade, `db/`, `write/`, `audit/` or `cold/`, plus
+        `createRequire` and dynamic imports whose specifier is not a plain
+        string literal; `respects-scoped-view` plants canary facts in a sibling
+        namespace and fails if any surface. A submission that does not report
+        6/6 cannot be merged.
+
+  - type: input
+    id: driver-name
+    attributes:
+      label: Driver name
+      description: The identifier it registers under, lowercase, e.g. `lancedb`.
+    validations:
+      required: true
+
+  - type: textarea
+    id: engine
+    attributes:
+      label: Engine it delegates to
+      description: >-
+        Name the retrieval engine, its upstream repository, its license, and its
+        version. State whether it runs in-process, as a sidecar, or over the network.
+    validations:
+      required: true
+
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Why this engine earns a cartridge
+      description: >-
+        What it does that `baseline` and `graph` do not. Recall on a particular
+        shape of query, a data structure the others cannot express, an operational
+        property. Concrete beats adjectival.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: dependencies
+    attributes:
+      label: New runtime dependencies
+      options:
+        - None — pure TypeScript over the ScopedView
+        - New npm dependencies (list them below with licenses)
+        - A sidecar process or container
+        - A network service the operator must run
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependency-detail
+    attributes:
+      label: Dependency and license detail
+      description: >-
+        List every new dependency with its SPDX license. The tree today is
+        permissive throughout (MIT, Apache-2.0, ISC, BSD) with no copyleft
+        dependencies; a copyleft or source-unavailable dependency is a blocker.
+
+  - type: textarea
+    id: offline
+    attributes:
+      label: Behaviour with no credentials
+      description: >-
+        The kernel runs its full story with no API key, no database and no network.
+        State exactly what your driver does in that environment. If it cannot run
+        offline, describe how it degrades — brownout, never hard-fail.
+    validations:
+      required: true
+
+  - type: textarea
+    id: conformance
+    attributes:
+      label: Conformance output
+      description: >-
+        Paste the real, unedited output of `npx tsx src/cli.ts conformance <driverName>`.
+        "Should pass" is not evidence. Wrap it in a fenced code block.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Boundary self-check
+      options:
+        - label: >-
+            The driver imports only `src/types.js`, `src/retrieval/` and `src/embed/`.
+            It does not touch storage, the write path, or audit.
+          required: true
+        - label: The driver performs no writes and mutates nothing it is handed.
+          required: true
+        - label: >-
+            It reads only through the `ScopedView` and never widens the namespace it
+            was given.
+          required: true
+        - label: Conformance reports 6/6 and the output above is a real run.
+          required: true
+        - label: >-
+            I understand `kernel/src/driver/` is Apache-2.0 and that I have signed
+            or will sign the CLA.
+          required: true
