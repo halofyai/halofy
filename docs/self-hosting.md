@@ -1,8 +1,8 @@
 # Self-hosting
 
-Halofy is designed to be run by the organization whose memory it holds. This
-page covers the Compose stack, configuration, Postgres requirements, backups,
-upgrades, and — importantly — what the open build deliberately does not
+Halofy is designed to be run by the organization whose agents and applications
+it governs. This page covers the Compose stack, configuration, Postgres
+requirements, backups, upgrades, and what the open build deliberately does not
 include.
 
 If you only want to try the kernel, you do not need any of this. `npm run demo`
@@ -11,10 +11,11 @@ runs the full story with no database and no credentials; see
 
 ## What you are running
 
-- One Node.js process: the kernel, its HTTP API, and the console UI.
-- One Postgres database with the `pgvector` extension. It holds the memory
-  index, the embedding vectors, the policy store, and the audit log. There is
-  no second datastore to operate.
+- One Node.js process: the access and governance kernel, its HTTP API, MCP
+  surface, and console UI.
+- One Postgres database with the `pgvector` extension. It holds organizational
+  context, the embedding vectors, identities, policy, provenance, and audit.
+  There is no second datastore to operate.
 - A knowledge directory on a persistent volume for L3 cold-tier concepts.
 
 That is the whole topology. Any warm-store mirror or retrieval sidecar you add
@@ -310,8 +311,9 @@ deliberate — pruning them would fork the schema history and make every future
 upgrade a merge conflict.
 
 Nothing in the list above is required to run the system. A self-hosted Halofy
-with no external credentials at all is a working memory kernel: it stores,
-supersedes, retrieves, governs, audits, and erases.
+with no external credentials at all is a working access and governance layer:
+it resolves identity, enforces policy, stores, supersedes, retrieves, audits,
+and erases.
 
 ## Where next
 

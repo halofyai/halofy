@@ -4,9 +4,9 @@ Halofy does not build retrievers. Ranking is delegated to engines mounted as
 read-only cartridges, permanently, and the shipped `baseline` driver exists as
 a referee control lane rather than as a product.
 
-If you build a retrieval engine, this is how you mount it inside a governed
-memory kernel without reimplementing custody, ACL, provenance, or audit — and
-without the kernel needing to trust your code.
+If you build a retrieval engine, this is how you mount it inside Halofy's
+governed organizational context layer without reimplementing identity, ACL,
+provenance, or audit — and without the kernel needing to trust your code.
 
 ## Why the boundary is shaped this way
 

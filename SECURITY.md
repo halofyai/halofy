@@ -1,9 +1,10 @@
 # Security policy
 
-Halofy is a memory kernel. Its whole job is to decide who may read which
-sentence, to record that decision, and to be able to prove afterwards that it
-did. That makes almost every interesting bug in this codebase a security bug.
-We would rather hear about it from you than from a customer.
+Halofy is an access and governance layer for AI agents across an organization.
+Its job is to resolve who an agent is, decide which organizational context it
+may use, record that decision, and prove what happened afterwards. That makes
+almost every interesting bug in this codebase a security bug. We would rather
+hear about it from you than from a customer.
 
 - **Report a vulnerability:** the repository's **Security → Report a vulnerability**
   (GitHub Private Vulnerability Reporting), or <security@halofy.ai> as a fallback.

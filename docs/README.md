@@ -1,8 +1,10 @@
 # Halofy documentation
 
-Halofy is an organizational memory kernel for AI agent fleets. It owns
-custody of memory — the write path, tier placement, movement, and governance —
-and delegates ranking to retrieval engines mounted as read-only drivers.
+Halofy is the open access and governance layer for AI agents across an
+organization. It gives agents, applications, and operators one server-owned
+identity and policy model across shared organizational context, with
+provenance, audit, and signed erasure. The kernel maintains that context and
+delegates ranking to retrieval engines mounted as read-only drivers.
 
 ## Start here
 
@@ -20,7 +22,7 @@ and delegates ranking to retrieval engines mounted as read-only drivers.
 Zero to a working kernel. Begins with `npm run demo`, which runs the complete
 story — bootstrap, pin, write, hybrid search, cold-tier fault, stats, audit,
 and a signed erasure certificate — with no API key, no database, and no
-network. Then: installing, issuing the first API key, writing a memory,
+network. Then: installing, issuing the first API key, writing governed context,
 searching, assembling a working set, and reading the audit trail, with real
 commands and real output.
 

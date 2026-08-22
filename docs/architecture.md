@@ -3,10 +3,11 @@
 This document describes the mechanism, for people who intend to modify it. It
 assumes you have run the demo in [getting-started.md](getting-started.md).
 
-The shortest possible summary: Halofy owns **custody** of memory — the write
-path, tier placement, movement, and governance — and **delegates ranking** to
-retrieval engines mounted as read-only drivers. Everything else follows from
-that split.
+The shortest possible summary: Halofy is the **access and governance layer**
+for AI agents across an organization. It resolves who an agent is, decides what
+context it may use, governs how that context changes, and records the outcome.
+Ranking is delegated to retrieval engines mounted as read-only drivers.
+Everything else follows from that split.
 
 ## Contents
 
@@ -412,7 +413,7 @@ When you touch a namespace predicate, add a regression test with `_`, `%`, and
 ## The context allocator
 
 `mem_assemble` returns ranked blocks. It never concatenates them into a
-prompt — placement is the agent framework's job, and a memory kernel that
+prompt — placement is the agent framework's job, and an access layer that
 formats prompts becomes an agent framework.
 
 Selection runs in priority order into a greedy packer:

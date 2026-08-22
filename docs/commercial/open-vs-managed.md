@@ -19,10 +19,11 @@ actually have:
 
 ---
 
-## Memory custody
+## Access and governance
 
-Everything in this section is fully open. This is the product's claim, and a
-claim about custody that you cannot read the source of is not worth much.
+Everything in this section is fully open. This is the product's core boundary:
+who an agent is, what organizational context it may use, how that context may
+change, and how every decision is recorded.
 
 | Capability | Open build | Managed |
 |---|---|---|
@@ -77,10 +78,10 @@ your deployment, the commercial licence exists specifically for that:
 
 ## Choosing
 
-**Run the open build if** you want the memory kernel and you are willing to
-operate Postgres. Nothing about it is crippled. It runs a full end-to-end story
-with no API key, no database server, no network, and no model download — see
-[getting-started.md](../getting-started.md).
+**Run the open build if** you want to operate the access and governance layer
+inside your own organization. Nothing about it is crippled. It runs a full
+end-to-end story with no API key, no database server, no network, and no model
+download — see [getting-started.md](../getting-started.md).
 
 **Buy the managed service if** you want the AI gateway (routing, spend
 attribution, observability), the hosted connector catalogue, managed channel

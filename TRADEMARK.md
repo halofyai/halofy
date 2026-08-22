@@ -78,7 +78,7 @@ Concretely:
 - Do **say clearly** what you forked, and prominently. All of these are fine and
   encouraged:
   - *"Acme Recall — a fork of Halofy"*
-  - *"Acme Recall is derived from the Halofy organizational memory kernel"*
+  - *"Acme Recall is derived from the Halofy access and governance kernel"*
   - *"Based on the Halofy project by Halofy"*
 - Do not describe your fork as "official", "certified", "supported by Halofy",
   "endorsed", or "the enterprise edition of Halofy".

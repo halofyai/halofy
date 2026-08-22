@@ -1,7 +1,8 @@
 # Halofy kernel
 
-The kernel package: the memory syscalls, the storage tiers, the write path, the
-governance surfaces, the HTTP and MCP transports, the CLI, and the control room.
+The implementation of Halofy's organization-wide access and governance layer:
+server-owned identity, namespace ACL, policy, provenance, audit, signed erasure,
+governed context syscalls, HTTP and MCP transports, CLI, and control room.
 
 This file is the package-level map — scripts, layout, environment, development
 commands. For the conceptual model, the schema, and the per-directory source

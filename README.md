@@ -1,8 +1,8 @@
 <h1 align="center">Halofy</h1>
 
 <p align="center">
-  <strong>An open organizational-memory kernel for AI agent fleets.</strong><br />
-  Custody, access control, provenance, audit, and signed erasure. Retrieval is delegated to swappable read-only drivers.
+  <strong>The open access and governance layer for AI agents across your organization.</strong><br />
+  Give every agent the right organizational context through one identity and policy model, with provenance, audit, and signed erasure.
 </p>
 
 <p align="center">
@@ -22,32 +22,36 @@
 
 ---
 
-An agent fleet needs more than similarity search. It needs answers to harder
-questions: **who may read this fact, where did it come from, what happened when
-it contradicted an older fact, and can deletion be proven?** Halofy is the layer
-that answers those questions.
+As AI spreads across an organization, every agent needs access to shared
+context without becoming its own identity system, policy engine, or audit silo.
+Halofy sits between organizational knowledge and the agents that use it. It
+resolves identity, enforces access, governs change, records every outcome, and
+makes erasure independently verifiable.
 
-It owns the memory lifecycle and keeps retrieval replaceable. The result is a
-kernel you can inspect, self-host, run offline, and connect over MCP or HTTP.
+Underneath that governance boundary, Halofy maintains durable context and keeps
+retrieval replaceable. The result is infrastructure you can inspect, self-host,
+run offline, and connect to any agent over MCP or HTTP.
 
 ## Why Halofy
 
-| Custody | Governance | Open retrieval |
+| Organization-wide access | Governed context | Open infrastructure |
 |---|---|---|
-| Writes follow one auditable path: extract → verify → dedupe → supersede → provenance. Facts are never silently overwritten. | Identity is resolved from credentials, ACLs are enforced in the repository layer, every syscall audits, and erasure produces an offline-verifiable certificate. | Drivers receive an ACL-scoped, read-only view and return ranked references. A six-check conformance kit enforces the boundary. |
+| Agents, applications, and operators use the same server-resolved identity, namespace ACL, roles, and policy boundary over MCP or HTTP. | Every change follows one auditable path with provenance, supersedence, append-only history, and signed erasure. | Postgres remains the authority while retrieval engines plug in through an ACL-scoped, read-only driver interface. |
 
 ### What ships in this repository
 
-- **Memory syscalls over MCP and HTTP:** `mem_write`, `mem_read`, `mem_search`,
+- **One governed access surface over MCP and HTTP:** `mem_write`, `mem_read`, `mem_search`,
   `mem_assemble`, `mem_fault`, `mem_stats`, `mem_forget`, policy, sharing,
   pinning, export, and manifest operations.
-- **A bi-temporal custody write path:** provenance, entity resolution, exact and
+- **Organization-wide identity and access control:** credentials resolve actor,
+  role, namespace, and source scope server-side before any read or write.
+- **A governed context lifecycle:** provenance, entity resolution, exact and
   semantic dedupe, supersedence chains, and append-only audit.
-- **Two storage tiers:** Postgres/pgvector for operational memory and encrypted,
-  Git-versioned knowledge for the cold tier. Embedded PGlite is the zero-setup
-  local default.
-- **A frameworkless control room:** memory, sources, policies, conflicts,
-  retrieval quality, teams, audit, alerts, skills, connected apps, and export.
+- **One organizational authority across two tiers:** Postgres/pgvector for
+  operational context and encrypted, Git-versioned knowledge for the cold tier.
+  Embedded PGlite is the zero-setup local default.
+- **A frameworkless control room:** access, teams, sources, policies, conflicts,
+  retrieval quality, audit, alerts, skills, connected apps, and export.
 - **Four public connectors:** filesystem, Postgres, Obsidian, and manual CSV
   import. All feed the same governed write path.
 - **A hermetic test lane:** embedded PGlite, deterministic `StubLlm`,
@@ -90,7 +94,7 @@ npm test
 npx tsx src/cli.ts conformance baseline
 ```
 
-The current standalone verification passes **2,675 tests across 204 files** and
+The current standalone verification passes **2,678 tests across 205 files** and
 all **6/6** driver-conformance checks. Timings and generated identifiers vary by
 machine; the behavior does not.
 
@@ -122,14 +126,16 @@ schemas do not accept caller-asserted identity fields.
 
 1. **Identity is server-owned.** Namespace, actor, role, and source scope come
    from the credential, never from a request body.
-2. **Writes have custody.** Corrections close the prior fact's validity interval
+2. **Access is organization-wide and policy-bound.** The same ACL and role
+   decisions apply across agents, applications, operators, MCP, and HTTP.
+3. **Changes are governed.** Corrections close the prior fact's validity interval
    and link the replacement. They do not overwrite history.
-3. **Reads are delegated.** A retriever sees only an ACL-scoped `ScopedView` and
+4. **Reads are delegated.** A retriever sees only an ACL-scoped `ScopedView` and
    can return references only. It cannot write or reach audit/storage modules.
-4. **Postgres is the authority.** Memory, embeddings, policy, provenance,
+5. **Postgres is the authority.** Context, embeddings, policy, provenance,
    tombstones, and audit live together. PGlite embeds the same model for local
    development and tests.
-5. **Every outcome audits.** Success, denial, miss, brownout, and error paths all
+6. **Every outcome audits.** Success, denial, miss, brownout, and error paths all
    append an event.
 
 Read [the architecture guide](docs/architecture.md) for the syscall pipeline,
@@ -179,7 +185,8 @@ The permanent boundary is documented in
 
 ### Deliberately commercial
 
-Halofy's managed operations, not memory custody, fund the open kernel:
+Halofy's managed operations, not the access and governance boundary, fund the
+open kernel:
 
 - model routing, spend attribution, and gateway observability;
 - billing, credit ledger, and hosted usage plans;
@@ -190,8 +197,8 @@ Halofy's managed operations, not memory custody, fund the open kernel:
 - managed infrastructure, upgrades, backups, uptime, and support commitments.
 
 None of those components is required to run this repository. The connector
-framework, baseline model plumbing, memory lifecycle, governance, console,
-self-host stack, and test suite are present and runnable.
+framework, baseline model plumbing, governed context lifecycle, access control,
+console, self-host stack, and test suite are present and runnable.
 
 ## Documentation
 

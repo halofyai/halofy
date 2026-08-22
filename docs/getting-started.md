@@ -1,11 +1,13 @@
 # Getting started
 
-Halofy is a memory kernel. It owns the write path, placement, and governance
-of an organization's memory, and it delegates ranking to swappable retrieval
-engines mounted as read-only drivers.
+Halofy is the access and governance layer between an organization's shared
+context and the AI agents that use it. It resolves identity server-side,
+enforces namespace and role policy, governs every change, and records every
+outcome. Retrieval remains replaceable through read-only drivers.
 
-This page takes you from a fresh clone to a running kernel that has stored a
-fact, answered a search, and produced an audit trail you can read.
+This page takes you from a fresh clone to a running governance layer that has
+issued an organization-scoped identity, stored a fact, enforced its access
+boundary, answered a search, and produced an audit trail you can read.
 
 The transcripts below are captured from real runs against this repository.
 Identifiers (ULIDs, keys, timestamps, ports) will differ in your run; shapes

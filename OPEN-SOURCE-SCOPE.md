@@ -21,11 +21,12 @@ move a capability behind a hosted service, or introduce limits after users have
 built around the original behaviour. A licence alone does not promise that
 future versions will preserve today's useful boundary.
 
-Storing an organization's memory is a decision with a long tail. You are
-choosing where facts about your company will live for years, under what access
-rules, and with what audit trail. You cannot make that decision responsibly
-against a project that might shrink under you. So this document states, at a
-level that survives refactoring, what will not shrink.
+Giving AI agents access to an organization's shared context is a decision with
+a long tail. You are choosing where facts about your company will live for
+years, who may use them, how changes are governed, and what audit trail proves
+those decisions. You cannot make that choice responsibly against a project
+that might shrink under you. So this document states, at a level that survives
+refactoring, what will not shrink.
 
 Everything below is a commitment about **the project**, made by Halofy, in
 public, versioned, and diffable. Where it conflicts with marketing copy, a
@@ -301,19 +302,20 @@ Stated plainly so nobody has to infer it:
 Argued rather than apologised for. If the reasoning is wrong, argue with it in a
 Discussion — but the split is deliberate, not arbitrary.
 
-The line we drew: **custody of memory is open; the operations business around it
-is commercial.** Everything required to store, govern, audit, erase and retrieve
-an organization's memory on your own infrastructure is in the open build.
+The line we drew: **the access and governance boundary is open; the operations
+business around it is commercial.** Everything required to resolve identity,
+enforce access, store, govern, audit, erase, and retrieve organizational context
+on your own infrastructure is in the open build.
 Everything that is fundamentally a *service Halofy runs on your behalf* — with
 vendor contracts, an on-call rotation, an upstream API catalogue to keep working,
 and a bill — is commercial.
 
 **The AI gateway: model routing, spend attribution, observability.** Routing
 inference across providers, attributing spend to teams and agents, and reporting
-on it is a different product from a memory kernel. It requires provider
-relationships, per-model rate cards that change monthly, and someone paid to keep
-them accurate. Open-sourcing it would not make your memory kernel more
-trustworthy; it would just hand a competitor a price book.
+on it is a different product from an access and governance kernel. It requires
+provider relationships, per-model rate cards that change monthly, and someone
+paid to keep them accurate. Open-sourcing it would not make your governance
+boundary more trustworthy; it would just hand a competitor a price book.
 
 **Billing, credit ledgers and usage caps.** These exist to bill Halofy's
 customers. They are useless to a self-hoster, so their implementations are not
