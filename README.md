@@ -1,6 +1,4 @@
-<p align="center">
-  <img src=".github/assets/halofy-hero.svg" alt="Halofy — memory your agents can account for" width="100%" />
-</p>
+<h1 align="center">Halofy</h1>
 
 <p align="center">
   <strong>An open organizational-memory kernel for AI agent fleets.</strong><br />
