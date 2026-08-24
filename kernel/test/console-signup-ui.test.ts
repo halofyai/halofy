@@ -44,6 +44,17 @@ describe("inline organization signup (setup gate, SG1/SG2)", () => {
     expect(LOGIN_HTML).toContain('window.location.replace("/console/")');
   });
 
+  it("lets a fresh self-hosted deployment create its first local owner", () => {
+    expect(LOGIN_HTML).toContain('id="local-bootstrap"');
+    expect(LOGIN_HTML).toContain('id="bootstrap-token"');
+    expect(LOGIN_HTML).toContain('id="bootstrap-display-name"');
+    expect(LOGIN_HTML).toContain('id="bootstrap-organization"');
+    expect(LOGIN_HTML).toContain('id="bootstrap-email"');
+    expect(LOGIN_HTML).toContain('id="bootstrap-password"');
+    expect(LOGIN_HTML).toContain('fetch("/auth/bootstrap"');
+    expect(LOGIN_HTML).toContain('showView("local-bootstrap")');
+  });
+
   it("has NO wizard steps and NO skip of any kind (SG2)", () => {
     expect(LOGIN_HTML).not.toContain("ob-step-");
     expect(LOGIN_HTML).not.toContain("ob-intro");
@@ -72,6 +83,8 @@ describe("inline organization signup (setup gate, SG1/SG2)", () => {
     expect(LOGIN_HTML).not.toContain("Halofy Halo Mem");
     expect(LOGIN_HTML).toContain("<div><b>Halofy</b></div>");
     expect(LOGIN_HTML).not.toContain("<small>Halo Mem</small>");
+    expect(LOGIN_HTML).toContain('assets/marks/halo-orb-static.png');
+    expect(LOGIN_HTML).not.toContain('assets/marks/halofy-mark-white.svg');
     expect(APP_CSS).toMatch(/\.auth-story-brand img\{[^}]*width:20px;height:20px/);
     expect(APP_CSS).toMatch(/\.auth-story-brand b\{[^}]*line-height:20px/);
   });

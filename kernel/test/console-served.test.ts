@@ -256,9 +256,9 @@ describe("static console - served publicly with correct content-types", () => {
     expect(res.text).toContain('id="submit">Sign in via email</button>');
     expect(res.text).toContain('id="tab-signup" role="tab" aria-selected="false">Create account</button>');
     expect(res.text).toContain('id="organization-name"');
-    expect(res.text).not.toContain("/auth/bootstrap");
-    expect(res.text).not.toContain("First installation?");
-    expect(res.text).not.toContain("Create first owner");
+    expect(res.text).toContain("/auth/bootstrap");
+    expect(res.text).toContain('id="local-bootstrap"');
+    expect(res.text).toContain('id="bootstrap-token"');
   });
 
   it("GET /console/login.html 308-redirects to the clean URL, query preserved", async () => {

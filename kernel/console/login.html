@@ -7,7 +7,7 @@
   <div class="auth-frame">
     <section class="auth-story" aria-label="Halo Mem overview">
       <div class="auth-story-brand">
-        <img src="assets/marks/halofy-mark-white.svg" alt="" aria-hidden="true" />
+        <img src="assets/marks/halo-orb-static.png" alt="" aria-hidden="true" />
         <div><b>Halofy</b></div>
       </div>
 
@@ -110,7 +110,7 @@
 
         <span class="auth-stream-glow"></span>
         <span class="auth-stream-core">
-          <img src="assets/marks/halofy-mark-white.svg" alt="" />
+          <img src="assets/marks/halo-orb-static.png" alt="" />
         </span>
       </div>
 
@@ -225,6 +225,38 @@
       </div>
       <div class="hint auth-error" id="invite-error" role="alert"></div>
       <button class="btn btn--solid auth-submit" type="submit" id="invite-submit">Activate account</button>
+    </form>
+
+    <!-- A fresh self-hosted deployment has no identity provider and no owner.
+         env:init generates the one-use credential consumed by this form. -->
+    <form class="auth-form" id="local-bootstrap" novalidate hidden>
+      <h1 id="local-bootstrap-title" tabindex="-1">Set up Halofy</h1>
+      <div class="sub">Create the first local owner for this deployment.</div>
+      <div class="field">
+        <label for="bootstrap-token">Bootstrap token</label>
+        <input class="input" type="password" id="bootstrap-token" autocomplete="off" required />
+        <div class="hint">Find this one-use token in <code>kernel/.env</code>.</div>
+      </div>
+      <div class="field">
+        <label for="bootstrap-display-name">Your name</label>
+        <input class="input" id="bootstrap-display-name" autocomplete="name" maxlength="80" placeholder="Your full name" required />
+      </div>
+      <div class="field">
+        <label for="bootstrap-organization">Organization name</label>
+        <input class="input" id="bootstrap-organization" autocomplete="organization" minlength="2" maxlength="100" placeholder="Acme Labs" required />
+      </div>
+      <div class="field">
+        <label for="bootstrap-email">Email</label>
+        <input class="input" type="email" id="bootstrap-email" autocomplete="username" required />
+      </div>
+      <div class="field">
+        <label for="bootstrap-password">Password</label>
+        <input class="input" type="password" id="bootstrap-password" autocomplete="new-password" minlength="12" required />
+        <div class="hint">At least 12 characters.</div>
+      </div>
+      <div class="hint auth-error" id="local-bootstrap-error" role="alert"></div>
+      <button class="btn btn--solid auth-submit" type="submit" id="local-bootstrap-submit">Create local workspace</button>
+      <button type="button" class="auth-link" id="local-bootstrap-back">Back to sign in</button>
     </form>
 
     <form class="auth-form" id="organization-signup" novalidate hidden>
@@ -365,7 +397,7 @@
 
     // ---- view switching ----------------------------------------------------
 
-    var views = ["auth-loading", "sso-pending", "sso-forgot", "sso-recovery", "login-form", "organization-signup"];
+    var views = ["auth-loading", "sso-pending", "sso-forgot", "sso-recovery", "login-form", "local-bootstrap", "organization-signup"];
     function showView(id) {
       views.forEach(function (v) { hide($(v)); });
       show($(id));
@@ -374,6 +406,7 @@
         "sso-forgot": "forgot-title",
         "sso-recovery": "recovery-title",
         "login-form": "native-title",
+        "local-bootstrap": "local-bootstrap-title",
         "organization-signup": "organization-signup-title"
       };
       var focusTarget = focusIds[id] ? $(focusIds[id]) : null;
@@ -459,6 +492,48 @@
           setMsg(error, "Something went wrong. Please try again.");
           button.focus();
         });
+    }
+
+    function completeLocalBootstrap(ev) {
+      ev.preventDefault();
+      var button = $("local-bootstrap-submit");
+      var error = $("local-bootstrap-error");
+      var input = {
+        token: $("bootstrap-token").value,
+        displayName: $("bootstrap-display-name").value.trim(),
+        organization: $("bootstrap-organization").value.trim(),
+        email: $("bootstrap-email").value.trim().toLowerCase(),
+        password: $("bootstrap-password").value,
+      };
+      setMsg(error, "");
+      if (!input.token || !input.displayName || input.organization.length < 2 ||
+          !input.email || input.password.length < 12) {
+        setMsg(error, "Complete every field and use a password of at least 12 characters.");
+        return;
+      }
+      button.disabled = true;
+      fetch("/auth/bootstrap", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      }).then(function (res) {
+        if (res.status === 201) {
+          window.location.replace("/console/");
+          return;
+        }
+        button.disabled = false;
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          setMsg(error, res.status === 401
+            ? "The bootstrap token is invalid, expired, or has already been used."
+            : (data.error || "We could not create the local workspace."));
+          button.focus();
+        });
+      }).catch(function () {
+        button.disabled = false;
+        setMsg(error, "Something went wrong. Please try again.");
+        button.focus();
+      });
     }
 
     function setMode(next) {
@@ -851,8 +926,8 @@
     $("tab-signin").addEventListener("click", function () { setMode("sign_in"); });
     $("tab-signup").addEventListener("click", function () {
       if (!cfg) {
-        setMsg($("login-error"), "Account creation with Google is not available on this deployment.");
-        $("tab-signup").focus();
+        setMsg($("local-bootstrap-error"), "");
+        showView("local-bootstrap");
         return;
       }
       setMode("sign_up");
@@ -870,6 +945,11 @@
     $("recovery-form").addEventListener("submit", recoverySubmit);
     $("sso-toggle").addEventListener("click", googleLogin);
     $("organization-signup").addEventListener("submit", completeOrganizationSignup);
+    $("local-bootstrap").addEventListener("submit", completeLocalBootstrap);
+    $("local-bootstrap-back").addEventListener("click", function () {
+      setMode("sign_in");
+      showView("login-form");
+    });
     $("organization-signup-back").addEventListener("click", function () {
       setOrganizationSignupMarker(false);
       setMode("sign_in");
