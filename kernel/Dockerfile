@@ -2,7 +2,7 @@
 # runtime dependencies, generated JavaScript, static console assets, and the
 # cold-tier mount point. No TypeScript runner or source tree is needed at run
 # time.
-FROM node:22-slim AS builder
+FROM node:25-slim AS builder
 
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -31,7 +31,7 @@ RUN apt-get update \
       "cisco-ai-skill-scanner==${CISCO_SKILL_SCANNER_VERSION}" \
       "git+https://github.com/NVIDIA/SkillSpector.git@${SKILLSPECTOR_GIT_REF}"
 
-FROM node:22-slim AS runtime
+FROM node:25-slim AS runtime
 
 ENV NODE_ENV=production
 ENV HALOMEM_PORT=8787
