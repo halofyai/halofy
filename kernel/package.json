@@ -28,7 +28,7 @@
     "migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
-    "@electric-sql/pglite": "^0.2.17",
+    "@electric-sql/pglite": "^0.5.8",
     "@modelcontextprotocol/node": "^2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "gray-matter": "^4.0.3",
